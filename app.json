@@ -4,11 +4,9 @@
     "slug": "anvesh911",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "null",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#070B14",
     "splash": {
-      "image": "null",
       "resizeMode": "contain",
       "backgroundColor": "#070B14"
     },
@@ -21,7 +19,6 @@
       "targetSdkVersion": 35,
       "minSdkVersion": 24,
       "adaptiveIcon": {
-        "foregroundImage": "null",
         "backgroundColor": "#070B14"
       },
       "permissions": [
