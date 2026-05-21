@@ -8,61 +8,22 @@
     "backgroundColor": "#070B14",
     "scheme": "nachi",
     "platforms": ["android"],
+
     "android": {
       "package": "com.nachi.callmemory",
       "versionCode": 1,
-      "compileSdkVersion": 35,
-      "targetSdkVersion": 35,
-      "minSdkVersion": 24,
       "permissions": [
         "RECORD_AUDIO",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_PHONE_STATE",
-        "READ_CALL_LOG",
-        "USE_BIOMETRIC",
-        "USE_FINGERPRINT",
-        "VIBRATE",
-        "RECEIVE_BOOT_COMPLETED",
-        "SCHEDULE_EXACT_ALARM",
-        "INTERNET"
-      ],
-      "blockedPermissions": [
-        "android.permission.READ_CONTACTS"
+        "INTERNET",
+        "VIBRATE"
       ]
     },
+
     "plugins": [
       "expo-router",
       "expo-font",
-      [
-        "expo-av",
-        {
-          "microphonePermission": "Allow Nachi to record conversations."
-        }
-      ],
-      [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "Allow Nachi to use Face ID."
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "color": "#00B4FF"
-        }
-      ],
-      [
-        "expo-sqlite"
-      ]
-    ],
-    "experiments": {
-      "typedRoutes": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "5f0bf204-525a-419a-8a86-8ac2ab8f5c66"
-      }
-    }
+      "expo-splash-screen",
+      "expo-notifications"
+    ]
   }
 }
