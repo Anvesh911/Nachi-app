@@ -26,7 +26,7 @@
     "expo-notifications": "~0.29.0",
     "expo-haptics": "~14.0.0",
     "expo-linear-gradient": "~14.0.0",
-    "expo-blur": "~14.2.0",
+    "expo-blur": "~14.1.5",
     "react": "18.3.2",
     "react-native": "0.76.5",
     "react-native-reanimated": "~3.16.0",
