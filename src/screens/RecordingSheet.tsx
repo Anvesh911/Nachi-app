@@ -22,7 +22,7 @@ import {
 } from '../services/recordingService';
 import { useStore } from '../store/useStore';
 import { Conversation } from '../services/types';
-import { v4 as uuidv4 } from 'uuid'; // add uuid to deps
+const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
 
 interface Props {
   onClose: () => void;
