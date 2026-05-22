@@ -34,3 +34,46 @@
         "USE_FINGERPRINT",
         "VIBRATE",
         "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM",
+        "INTERNET"
+      ],
+      "blockedPermissions": [
+        "android.permission.READ_CONTACTS"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Nachi to record conversations."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Nachi to use Face ID."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#00B4FF"
+        }
+      ],
+      [
+        "expo-sqlite"
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5f0bf204-525a-419a-8a86-8ac2ab8f5c66"
+      }
+    }
+  }
+}
