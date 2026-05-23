@@ -155,15 +155,21 @@ export const useThemeStore = create<ThemeStore>((set) => ({
   },
 }));
 
-export const THEME_LIST: { name: ThemeName; label: string; emoji: string }[] = [
-  { name: 'dark',   label: 'Dark',         emoji: '🌙' },
-  { name: 'amoled', label: 'AMOLED Black', emoji: '⚫' },
-  { name: 'neon',   label: 'Blue Neon',    emoji: '💙' },
-  { name: 'light',  label: 'Light',        emoji: '☀️' },
-];
+// ─── useColors hook ───────────────────────────────────────────────────────────
+// Use this in EVERY screen instead of importing static Colors.
+// When user changes theme, all screens update instantly.
+//
+// Usage:
+//   const C = useColors();
+//   <View style={{ backgroundColor: C.background }}>
 
-// ─── Static exports (default dark) ───────────────────────────────────────────
-// These are kept so existing screens don't break before you update them
+export function useColors(): ColorPalette {
+  return useThemeStore((s) => s.Colors);
+}
+
+// ─── Static exports ───────────────────────────────────────────────────────────
+// Still exported so old code doesn't break.
+// Gradually replace Colors.xxx with C.xxx using useColors() in each screen.
 
 export const Colors = THEMES.dark;
 
@@ -205,3 +211,10 @@ export const Shadow = {
     elevation: 8,
   },
 } as const;
+
+export const THEME_LIST: { name: ThemeName; label: string; emoji: string }[] = [
+  { name: 'dark',   label: 'Dark',         emoji: '🌙' },
+  { name: 'amoled', label: 'AMOLED Black', emoji: '⚫' },
+  { name: 'neon',   label: 'Blue Neon',    emoji: '💙' },
+  { name: 'light',  label: 'Light',        emoji: '☀️' },
+];
