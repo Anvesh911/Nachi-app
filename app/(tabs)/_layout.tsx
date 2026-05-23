@@ -1,7 +1,7 @@
 // app/(tabs)/_layout.tsx
 // Tab navigator - converted from Flutter BottomAppBar + FloatingActionButton
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import {
   View,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
+  Animated,
 } from 'react-native';
 import { Colors, Radius } from '../../src/theme';
 import RecordingSheet from '../../src/screens/RecordingSheet';
@@ -42,7 +43,6 @@ export default function TabsLayout() {
         />
       </Tabs>
 
-      {/* Recording modal - converted from Flutter showModalBottomSheet */}
       <Modal
         visible={showRecord}
         animationType="slide"
@@ -62,9 +62,40 @@ export default function TabsLayout() {
   );
 }
 
+function MoonFAB({ onPress }: { onPress: () => void }) {
+  const glow = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 1800, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 1800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, []);
+
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.9] });
+  const glowScale   = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] });
+
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.fab} activeOpacity={0.85}>
+      {/* Animated glow ring */}
+      <Animated.View
+        style={[
+          styles.fabGlow,
+          { opacity: glowOpacity, transform: [{ scale: glowScale }] },
+        ]}
+      />
+      {/* Moon button */}
+      <View style={styles.fabInner}>
+        <Text style={{ fontSize: 26 }}>🌙</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 function CustomTabBar({
   state,
-  descriptors,
   navigation,
   onRecord,
 }: any & { onRecord: () => void }) {
@@ -81,12 +112,8 @@ function CustomTabBar({
         </Text>
       </TouchableOpacity>
 
-      {/* FAB - Record (converted from Flutter FloatingActionButton) */}
-      <TouchableOpacity onPress={onRecord} style={styles.fab}>
-        <View style={styles.fabInner}>
-          <Text style={{ fontSize: 26 }}>🎙️</Text>
-        </View>
-      </TouchableOpacity>
+      {/* Moon FAB */}
+      <MoonFAB onPress={onRecord} />
 
       {/* Starred tab */}
       <TouchableOpacity
@@ -136,6 +163,19 @@ const styles = StyleSheet.create({
   tabLabelActive: { color: Colors.neonBlue },
   fab: {
     marginTop: -28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 72,
+    height: 72,
+  },
+  fabGlow: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: Colors.neonBlue + '33',
+    borderWidth: 1,
+    borderColor: Colors.neonBlue + '66',
   },
   fabInner: {
     width: 60,
@@ -146,8 +186,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.neonBlue,
     shadowColor: Colors.neonBlue,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
+    shadowOpacity: 0.6,
     shadowRadius: 16,
     elevation: 12,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: '#00000088',
   },
 });
