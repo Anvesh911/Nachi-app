@@ -2,7 +2,7 @@
 // Home screen - converted from Flutter HomeScreen StatefulWidget
 // Uses FlashList instead of Flutter ListView.builder for performance
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
@@ -33,6 +34,8 @@ export default function HomeScreen() {
     setFilterTag,
     getFiltered,
     toggleStar,
+    removeConversation,
+    hideConversation,
     conversations,
   } = useStore();
 
@@ -47,6 +50,25 @@ export default function HomeScreen() {
     router.push(`/detail/${id}`);
   }, []);
 
+  function onLongPressConv(item: Conversation) {
+    Alert.alert(item.contact, 'What do you want to do?', [
+      {
+        text: 'Hide Conversation',
+        onPress: () => hideConversation(item.id),
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () =>
+          Alert.alert('Delete', 'Delete this conversation permanently?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: () => removeConversation(item.id) },
+          ]),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
   const renderItem = useCallback(
     ({ item }: { item: Conversation }) => (
       <ConvCard
@@ -54,6 +76,7 @@ export default function HomeScreen() {
         searchQuery={searchQuery}
         onPress={() => onPressConv(item.id)}
         onStar={() => toggleStar(item.id)}
+        onLongPress={() => onLongPressConv(item)}
       />
     ),
     [searchQuery, toggleStar]
@@ -66,13 +89,13 @@ export default function HomeScreen() {
         <View>
           <Text style={styles.greeting}>GOOD DAY</Text>
           <Text style={styles.appName}>
-            Nachi <Text style={{ color: Colors.neonBlue }}>·</Text>
+            AnVy <Text style={{ color: Colors.neonBlue }}>·</Text>
           </Text>
         </View>
         <LiveDot />
       </View>
 
-      {/* Search bar - converted from Flutter TextField in Container */}
+      {/* Search bar */}
       <View style={styles.searchContainer}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -91,7 +114,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Filter tags - converted from Flutter horizontal ListView */}
+      {/* Filter tags */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -111,7 +134,7 @@ export default function HomeScreen() {
         ))}
       </ScrollView>
 
-      {/* Starred horizontal row (when no search active) */}
+      {/* Starred horizontal row */}
       {!searchQuery && starred.length > 0 && (
         <View style={styles.starredSection}>
           <SectionLabel label="⭐ Starred" count={starred.length} />
@@ -136,12 +159,13 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Conversations list - FlashList replaces Flutter ListView.builder */}
+      {/* Conversations list */}
       <View style={styles.listContainer}>
         <SectionLabel
           label={searchQuery ? `Results for "${searchQuery}"` : 'Recent Conversations'}
           count={filtered.length}
         />
+        <Text style={styles.hint}>Long-press a conversation to hide or delete</Text>
         <FlashList
           data={filtered}
           renderItem={renderItem}
@@ -158,11 +182,11 @@ export default function HomeScreen() {
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🔍</Text>
+              <Text style={styles.emptyIcon}>🌙</Text>
               <Text style={styles.emptyText}>
                 {searchQuery
                   ? `No conversations found for "${searchQuery}"`
-                  : 'No conversations yet. Tap 🎙️ to record.'}
+                  : 'No conversations yet. Tap 🌙 to record.'}
               </Text>
             </View>
           }
@@ -266,6 +290,13 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: Spacing.xl,
     marginTop: Spacing.lg,
+  },
+  hint: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    fontFamily: 'Sora_400Regular',
+    marginBottom: Spacing.sm,
+    marginTop: -8,
   },
   empty: {
     alignItems: 'center',
