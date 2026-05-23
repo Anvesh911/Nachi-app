@@ -1,6 +1,4 @@
 // src/screens/RecordingSheet.tsx
-// Converted from Flutter RecordingSheet StatefulWidget + AnimationController waveform
-// Uses expo-av Audio + Animated API
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -11,8 +9,12 @@ import {
   StyleSheet,
   Animated,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
+import { router } from 'expo-router';
 import { Colors, Typography, Spacing, Radius } from '../theme';
 import {
   startRecording,
@@ -22,42 +24,35 @@ import {
 } from '../services/recordingService';
 import { useStore } from '../store/useStore';
 import { Conversation } from '../services/types';
-const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
+import { SavedModal } from '../components';
 
-interface Props {
-  onClose: () => void;
-}
+const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
+const AVATAR_COLORS = ['#00B4FF', '#7C5CFC', '#FF9F43', '#55EFC4', '#FD79A8'];
+
+type Step = 'consent' | 'ready' | 'recording' | 'processing' | 'saved';
+
+interface Props { onClose: () => void; }
 
 export default function RecordingSheet({ onClose }: Props) {
-  const [step, setStep] = useState<'consent' | 'ready' | 'recording'>('consent');
-  const [seconds, setSeconds] = useState(0);
-  const [contactName, setContactName] = useState('');
+  const [step, setStep]                   = useState<Step>('consent');
+  const [seconds, setSeconds]             = useState(0);
+  const [contactName, setContactName]     = useState('');
+  const [processingMsg, setProcessingMsg] = useState('Saving...');
+  const [savedConvId, setSavedConvId]     = useState<string>('');
+  const [savedName, setSavedName]         = useState<string>('');
   const { addConversation } = useStore();
 
-  // Waveform bars - converted from Flutter AnimationController
-  const bars = useRef<Animated.Value[]>(
-    Array.from({ length: 24 }, () => new Animated.Value(4))
-  ).current;
+  const bars     = useRef<Animated.Value[]>(Array.from({ length: 24 }, () => new Animated.Value(4))).current;
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const waveRef = useRef<Animated.CompositeAnimation | null>(null);
+  const waveRef  = useRef<Animated.CompositeAnimation | null>(null);
 
   const startWaveform = useCallback(() => {
     const animations = bars.map((bar, i) => {
       const maxH = i % 3 === 0 ? 40 : i % 2 === 0 ? 28 : 18;
-      return Animated.loop(
-        Animated.sequence([
-          Animated.timing(bar, {
-            toValue: maxH,
-            duration: 300 + i * 30,
-            useNativeDriver: false,
-          }),
-          Animated.timing(bar, {
-            toValue: 4,
-            duration: 300 + i * 30,
-            useNativeDriver: false,
-          }),
-        ])
-      );
+      return Animated.loop(Animated.sequence([
+        Animated.timing(bar, { toValue: maxH, duration: 300 + i * 30, useNativeDriver: false }),
+        Animated.timing(bar, { toValue: 4,    duration: 300 + i * 30, useNativeDriver: false }),
+      ]));
     });
     waveRef.current = Animated.parallel(animations);
     waveRef.current.start();
@@ -70,15 +65,11 @@ export default function RecordingSheet({ onClose }: Props) {
 
   useEffect(() => {
     return () => {
-      clearInterval(timerRef.current!);
+      if (timerRef.current) clearInterval(timerRef.current);
       stopWaveform();
       cancelRecording();
     };
   }, []);
-
-  async function handleConsent() {
-    setStep('ready');
-  }
 
   async function handleStartRecord() {
     const ok = await startRecording();
@@ -88,72 +79,116 @@ export default function RecordingSheet({ onClose }: Props) {
     }
     setStep('recording');
     setSeconds(0);
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch (_) {}
     startWaveform();
     timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
   }
 
   async function handleStopRecord() {
-    clearInterval(timerRef.current!);
+    if (timerRef.current) clearInterval(timerRef.current);
     stopWaveform();
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    try { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy); } catch (_) {}
+    setStep('processing');
+    setProcessingMsg('Saving recording...');
+    try {
+      const result = await stopRecording();
+      await saveConversation(result?.filePath, result?.durationSeconds ?? seconds);
+    } catch (e) {
+      console.error('Stop recording error:', e);
+      await saveConversation(undefined, seconds);
+    }
+  }
 
-    const result = await stopRecording();
-    const name = contactName.trim() || 'Unknown Contact';
-    const initials = name
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
+  async function handleImportAudio() {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: ['audio/mpeg', 'audio/wav', 'audio/x-m4a', 'audio/mp4', 'audio/*'],
+        copyToCacheDirectory: true,
+      });
+      if (res.canceled || !res.assets?.[0]) return;
+      const file = res.assets[0];
+      setStep('processing');
+      setProcessingMsg('Importing audio...');
+      const dir  = FileSystem.documentDirectory + 'anvy_recordings/';
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+      const ext  = file.name.split('.').pop() ?? 'm4a';
+      const dest = dir + `imported_${makeId()}.${ext}`;
+      await FileSystem.copyAsync({ from: file.uri, to: dest });
+      await saveConversation(dest, 0, file.name.replace(/\.[^.]+$/, ''));
+    } catch (e) {
+      console.error('Import error:', e);
+      Alert.alert('Import Failed', 'Could not import the audio file. Please try again.');
+      setStep('ready');
+    }
+  }
 
-    const colors = ['#00B4FF', '#7C5CFC', '#FF9F43', '#55EFC4', '#FD79A8'];
-    const avatarColor = colors[Math.floor(Math.random() * colors.length)];
+  async function saveConversation(
+    filePath?: string,
+    durationSecs?: number,
+    importedName?: string,
+  ) {
+    setProcessingMsg('Saving conversation...');
+    const name     = importedName ?? (contactName.trim() || 'Unknown Contact');
+    const initials = name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+    const color    = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+    const dur      = durationSecs ?? 0;
+    const id       = makeId();
 
     const newConv: Conversation = {
-      id: Date.now().toString(),
+      id,
       contact: name,
       avatar: initials,
-      avatarColor,
+      avatarColor: color,
       date: new Date().toISOString(),
-      durationSeconds: result?.durationSeconds ?? seconds,
-      durationLabel: formatDuration(result?.durationSeconds ?? seconds),
+      durationSeconds: dur,
+      durationLabel: formatDuration(dur),
       tag: 'General',
       tagColor: '#636E72',
       starred: false,
-      audioFilePath: result?.filePath,
-      transcript: 'Transcription processing… Audio saved to device.',
+      hidden: false,
+      audioFilePath: filePath,
+      transcript: filePath
+        ? 'Audio saved to device. Transcription not available offline.'
+        : 'No audio recorded.',
       summary: {
-        keyPoints: ['Recording saved — AI summary will be generated shortly'],
+        keyPoints: ['Recording saved locally'],
         promises: [],
         dates: [],
-        reminders: ['Review this conversation once transcription completes'],
-        tone: 'Processing...',
-        toneEmoji: '⏳',
+        reminders: [],
+        tone: 'Recorded',
+        toneEmoji: '🎙️',
       },
-      topics: ['new', 'recording'],
+      topics: ['recording'],
     };
 
-    await addConversation(newConv);
-    onClose();
+    try {
+      await addConversation(newConv);
+    } catch (e) {
+      console.error('saveConversation error:', e);
+    }
+
+    // Show saved confirmation instead of immediately closing
+    setSavedConvId(id);
+    setSavedName(name);
+    setStep('saved');
   }
 
-  // ── Consent Step ─────────────────────────────────────────────────────────
+  // ── Consent ───────────────────────────────────────────────────────────────
   if (step === 'consent') {
     return (
       <View style={styles.sheet}>
         <View style={styles.handle} />
-        <Text style={styles.icon}>🎙️</Text>
+        <Text style={styles.icon}>🌙</Text>
         <Text style={styles.title}>Recording Consent</Text>
         <Text style={styles.body}>
-          Please ensure all parties in this conversation have given consent to be recorded.
+          Please ensure all parties have consented to be recorded.
           Recording without consent may violate local laws (IT Act, 2000).
         </Text>
         <View style={styles.btnRow}>
           <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
             <Text style={styles.cancelBtnText}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.primaryBtn} onPress={handleConsent}>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => setStep('ready')}>
             <Text style={styles.primaryBtnText}>I Consent ✓</Text>
           </TouchableOpacity>
         </View>
@@ -161,7 +196,41 @@ export default function RecordingSheet({ onClose }: Props) {
     );
   }
 
-  // ── Ready / Recording Step ────────────────────────────────────────────────
+  // ── Processing ────────────────────────────────────────────────────────────
+  if (step === 'processing') {
+    return (
+      <View style={styles.sheet}>
+        <View style={styles.handle} />
+        <ActivityIndicator size="large" color={Colors.neonBlue} style={{ marginVertical: 28 }} />
+        <Text style={styles.title}>{processingMsg}</Text>
+        <Text style={styles.hint}>Please wait...</Text>
+      </View>
+    );
+  }
+
+  // ── Saved ─────────────────────────────────────────────────────────────────
+  if (step === 'saved') {
+    return (
+      <View style={styles.sheet}>
+        <View style={styles.handle} />
+        <SavedModal
+          visible={true}
+          contactName={savedName}
+          onViewSummary={() => {
+            onClose();
+            router.push(`/detail/${savedConvId}?tab=summary`);
+          }}
+          onViewTranscript={() => {
+            onClose();
+            router.push(`/detail/${savedConvId}?tab=transcript`);
+          }}
+          onDismiss={onClose}
+        />
+      </View>
+    );
+  }
+
+  // ── Ready / Recording ─────────────────────────────────────────────────────
   return (
     <View style={styles.sheet}>
       <View style={styles.handle} />
@@ -170,19 +239,15 @@ export default function RecordingSheet({ onClose }: Props) {
         <>
           <Text style={styles.recLabel}>● RECORDING</Text>
           <Text style={styles.timer}>{formatDuration(seconds)}</Text>
-          {/* Live waveform - converted from Flutter AnimatedBuilder bars */}
           <View style={styles.waveform}>
             {bars.map((bar, i) => (
-              <Animated.View
-                key={i}
-                style={[styles.bar, { height: bar }]}
-              />
+              <Animated.View key={i} style={[styles.bar, { height: bar }]} />
             ))}
           </View>
         </>
       ) : (
         <>
-          <Text style={styles.title}>Ready to record</Text>
+          <Text style={styles.title}>New Recording</Text>
           <TextInput
             style={styles.input}
             placeholder="Contact name (optional)"
@@ -190,6 +255,9 @@ export default function RecordingSheet({ onClose }: Props) {
             value={contactName}
             onChangeText={setContactName}
           />
+          <TouchableOpacity style={styles.importBtn} onPress={handleImportAudio}>
+            <Text style={styles.importBtnText}>📂  Import Audio File (mp3, wav, m4a)</Text>
+          </TouchableOpacity>
         </>
       )}
 
@@ -199,7 +267,7 @@ export default function RecordingSheet({ onClose }: Props) {
         activeOpacity={0.8}
       >
         <Text style={styles.recBtnIcon}>
-          {step === 'recording' ? '⏹' : '🎙️'}
+          {step === 'recording' ? '⏹' : '🌙'}
         </Text>
       </TouchableOpacity>
       <Text style={styles.hint}>
@@ -221,115 +289,24 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     alignItems: 'center',
   },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    marginBottom: 24,
-  },
+  handle: { width: 40, height: 4, backgroundColor: Colors.border, borderRadius: 2, marginBottom: 24 },
   icon: { fontSize: 48, marginBottom: 12 },
-  title: {
-    ...Typography.headingL,
-    color: Colors.textPrimary,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  body: {
-    ...Typography.bodyM,
-    color: Colors.textMuted,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 28,
-  },
-  btnRow: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-  },
-  cancelBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    fontFamily: 'Sora_600SemiBold',
-    color: Colors.textMuted,
-  },
-  primaryBtn: {
-    flex: 1,
-    backgroundColor: Colors.neonBlue,
-    borderRadius: Radius.md,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    fontFamily: 'Sora_700Bold',
-    color: '#000',
-  },
-  recLabel: {
-    fontSize: 11,
-    color: Colors.red,
-    fontFamily: 'Sora_600SemiBold',
-    letterSpacing: 2,
-    marginBottom: 8,
-  },
-  timer: {
-    fontFamily: 'Sora_800ExtraBold',
-    fontSize: 52,
-    color: Colors.textPrimary,
-    letterSpacing: 2,
-    marginBottom: 16,
-  },
-  waveform: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    height: 52,
-    gap: 3,
-    marginBottom: 28,
-  },
-  bar: {
-    width: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.neonBlue,
-  },
-  input: {
-    width: '100%',
-    backgroundColor: Colors.surfaceVariant,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    color: Colors.textSecondary,
-    fontFamily: 'Sora_400Regular',
-    fontSize: 13,
-    marginBottom: 28,
-  },
-  recBtn: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.neonBlue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.neonBlue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 12,
-    marginBottom: 12,
-  },
-  recBtnActive: {
-    backgroundColor: Colors.red,
-    shadowColor: Colors.red,
-  },
+  title: { ...Typography.headingL, color: Colors.textPrimary, marginBottom: 12, textAlign: 'center' },
+  body: { ...Typography.bodyM, color: Colors.textMuted, textAlign: 'center', lineHeight: 22, marginBottom: 28 },
+  btnRow: { flexDirection: 'row', gap: 12, width: '100%' },
+  cancelBtn: { flex: 1, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
+  cancelBtnText: { fontFamily: 'Sora_600SemiBold', color: Colors.textMuted },
+  primaryBtn: { flex: 1, backgroundColor: Colors.neonBlue, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
+  primaryBtnText: { fontFamily: 'Sora_700Bold', color: '#000' },
+  recLabel: { fontSize: 11, color: Colors.red, fontFamily: 'Sora_600SemiBold', letterSpacing: 2, marginBottom: 8 },
+  timer: { fontFamily: 'Sora_800ExtraBold', fontSize: 52, color: Colors.textPrimary, letterSpacing: 2, marginBottom: 16 },
+  waveform: { flexDirection: 'row', alignItems: 'flex-end', height: 52, gap: 3, marginBottom: 28 },
+  bar: { width: 4, borderRadius: 2, backgroundColor: Colors.neonBlue },
+  input: { width: '100%', backgroundColor: Colors.surfaceVariant, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingHorizontal: 14, paddingVertical: 12, color: Colors.textSecondary, fontFamily: 'Sora_400Regular', fontSize: 13, marginBottom: 12 },
+  importBtn: { width: '100%', borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center', marginBottom: 24 },
+  importBtnText: { color: Colors.textMuted, fontFamily: 'Sora_600SemiBold', fontSize: 13 },
+  recBtn: { width: 72, height: 72, borderRadius: 36, backgroundColor: Colors.neonBlue, alignItems: 'center', justifyContent: 'center', shadowColor: Colors.neonBlue, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 20, elevation: 12, marginBottom: 12 },
+  recBtnActive: { backgroundColor: Colors.red, shadowColor: Colors.red },
   recBtnIcon: { fontSize: 28 },
-  hint: {
-    ...Typography.bodyS,
-    color: Colors.textMuted,
-  },
+  hint: { ...Typography.bodyS, color: Colors.textMuted },
 });

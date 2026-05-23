@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Nachi",
-    "slug": "anvesh911",
+    "name": "AnVy",
+    "slug": "anvy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,10 +12,10 @@
       "resizeMode": "contain",
       "backgroundColor": "#070B14"
     },
-    "scheme": "nachi",
+    "scheme": "anvy",
     "platforms": ["android"],
     "android": {
-      "package": "com.nachi.callmemory",
+      "package": "com.anveshnachi.anvy",
       "versionCode": 1,
       "compileSdkVersion": 35,
       "targetSdkVersion": 35,
@@ -47,13 +47,13 @@
       [
         "expo-av",
         {
-          "microphonePermission": "Allow Nachi to record conversations."
+          "microphonePermission": "Allow AnVy to record conversations."
         }
       ],
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow Nachi to use Face ID."
+          "faceIDPermission": "Allow AnVy to use Face ID."
         }
       ],
       [
@@ -72,7 +72,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "5f0bf204-525a-419a-8a86-8ac2ab8f5c66"
+        "projectId": "999d6f8c-96bd-4429-81d4-28ef5b028163"
       }
     }
   }

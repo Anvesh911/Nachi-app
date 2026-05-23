@@ -5,23 +5,28 @@ import { create } from 'zustand';
 import { Conversation, DEMO_CONVERSATIONS } from '../services/types';
 import {
   getAllConversations,
+  getHiddenConversations,
   insertConversation,
   updateStarred,
+  updateHidden,
   deleteConversation,
   searchConversations,
 } from '../services/database';
 
 interface StoreState {
   conversations: Conversation[];
+  hiddenConversations: Conversation[];
   isLoading: boolean;
   searchQuery: string;
   filterTag: string;
 
-  // Actions
   loadConversations: () => Promise<void>;
+  loadHiddenConversations: () => Promise<void>;
   addConversation: (conv: Conversation) => Promise<void>;
   toggleStar: (id: string) => Promise<void>;
   removeConversation: (id: string) => Promise<void>;
+  hideConversation: (id: string) => Promise<void>;
+  unhideConversation: (id: string) => Promise<void>;
   setSearchQuery: (q: string) => void;
   setFilterTag: (tag: string) => void;
   getFiltered: () => Conversation[];
@@ -30,6 +35,7 @@ interface StoreState {
 
 export const useStore = create<StoreState>((set, get) => ({
   conversations: [],
+  hiddenConversations: [],
   isLoading: false,
   searchQuery: '',
   filterTag: 'All',
@@ -38,7 +44,6 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ isLoading: true });
     try {
       const rows = await getAllConversations();
-      // If DB is empty on first launch, seed demo data
       if (rows.length === 0) {
         await get().seedDemoData();
       } else {
@@ -50,11 +55,25 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
 
-  seedDemoData: async () => {
-    for (const conv of DEMO_CONVERSATIONS) {
-      await insertConversation(conv);
+  loadHiddenConversations: async () => {
+    try {
+      const rows = await getHiddenConversations();
+      set({ hiddenConversations: rows });
+    } catch (e) {
+      console.error('loadHiddenConversations error:', e);
     }
-    set({ conversations: DEMO_CONVERSATIONS, isLoading: false });
+  },
+
+  seedDemoData: async () => {
+    try {
+      for (const conv of DEMO_CONVERSATIONS) {
+        await insertConversation(conv);
+      }
+      set({ conversations: DEMO_CONVERSATIONS, isLoading: false });
+    } catch (e) {
+      console.error('seedDemoData error:', e);
+      set({ conversations: [], isLoading: false });
+    }
   },
 
   addConversation: async (conv) => {
@@ -75,10 +94,45 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   removeConversation: async (id) => {
-    await deleteConversation(id);
-    set((s) => ({
-      conversations: s.conversations.filter((c) => c.id !== id),
-    }));
+    try {
+      await deleteConversation(id);
+      set((s) => ({
+        conversations: s.conversations.filter((c) => c.id !== id),
+        hiddenConversations: s.hiddenConversations.filter((c) => c.id !== id),
+      }));
+    } catch (e) {
+      console.error('removeConversation error:', e);
+    }
+  },
+
+  hideConversation: async (id) => {
+    try {
+      await updateHidden(id, true);
+      const conv = get().conversations.find((c) => c.id === id);
+      if (conv) {
+        set((s) => ({
+          conversations: s.conversations.filter((c) => c.id !== id),
+          hiddenConversations: [{ ...conv, hidden: true }, ...s.hiddenConversations],
+        }));
+      }
+    } catch (e) {
+      console.error('hideConversation error:', e);
+    }
+  },
+
+  unhideConversation: async (id) => {
+    try {
+      await updateHidden(id, false);
+      const conv = get().hiddenConversations.find((c) => c.id === id);
+      if (conv) {
+        set((s) => ({
+          hiddenConversations: s.hiddenConversations.filter((c) => c.id !== id),
+          conversations: [{ ...conv, hidden: false }, ...s.conversations],
+        }));
+      }
+    } catch (e) {
+      console.error('unhideConversation error:', e);
+    }
   },
 
   setSearchQuery: (q) => set({ searchQuery: q }),

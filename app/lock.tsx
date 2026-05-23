@@ -1,8 +1,7 @@
 // app/lock.tsx
 // PIN + biometric lock screen
-// Converted from Flutter LockScreen StatefulWidget + local_auth
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,6 +13,8 @@ import {
 import { router } from 'expo-router';
 import { Colors, Typography, Spacing, Radius } from '../src/theme';
 import {
+  isPinSet,
+  savePin,
   verifyPin,
   isBiometricAvailable,
   authenticateWithBiometric,
@@ -21,14 +22,23 @@ import {
 
 const KEYS = [1, 2, 3, 4, 5, 6, 7, 8, 9, '', 0, '⌫'] as const;
 
+type Mode = 'enter' | 'setup_new' | 'setup_confirm';
+
 export default function LockScreen() {
+  const [mode, setMode] = useState<Mode>('enter');
   const [pin, setPin] = useState('');
-  const [error, setError] = useState(false);
+  const [newPinTemp, setNewPinTemp] = useState('');
+  const [error, setError] = useState('');
   const [hasBiometric, setHasBiometric] = useState(false);
-  const shakeAnim = useState(new Animated.Value(0))[0];
+  const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    isBiometricAvailable().then(setHasBiometric);
+    (async () => {
+      const ready = await isPinSet();
+      if (!ready) setMode('setup_new');
+      const bio = await isBiometricAvailable();
+      setHasBiometric(bio);
+    })();
   }, []);
 
   function shake() {
@@ -45,23 +55,42 @@ export default function LockScreen() {
   async function onKey(k: number | string) {
     if (k === '⌫') {
       setPin((p) => p.slice(0, -1));
-      setError(false);
+      setError('');
       return;
     }
     if (k === '' || pin.length >= 4) return;
 
     const newPin = pin + String(k);
     setPin(newPin);
-    setError(false);
+    setError('');
 
-    if (newPin.length === 4) {
+    if (newPin.length < 4) return;
+
+    if (mode === 'enter') {
       const ok = await verifyPin(newPin);
       if (ok) {
         router.replace('/(tabs)');
       } else {
-        setError(true);
+        setError('Wrong PIN. Try again.');
         shake();
         setTimeout(() => setPin(''), 600);
+      }
+
+    } else if (mode === 'setup_new') {
+      setNewPinTemp(newPin);
+      setPin('');
+      setMode('setup_confirm');
+
+    } else if (mode === 'setup_confirm') {
+      if (newPin === newPinTemp) {
+        await savePin(newPin);
+        router.replace('/(tabs)');
+      } else {
+        setError('PINs do not match. Try again.');
+        shake();
+        setPin('');
+        setNewPinTemp('');
+        setMode('setup_new');
       }
     }
   }
@@ -71,14 +100,27 @@ export default function LockScreen() {
     if (ok) router.replace('/(tabs)');
   }
 
+  const subtitle =
+    mode === 'setup_new'     ? 'Choose a 4-digit PIN to secure AnVy' :
+    mode === 'setup_confirm' ? 'Enter the same PIN again to confirm' :
+    error                    ? error :
+                               'Enter PIN to continue';
+
+  const subtitleIsError = !!error;
+
   return (
     <View style={styles.root}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.lockIcon}>🔐</Text>
-        <Text style={styles.appName}>Nachi</Text>
-        <Text style={[styles.subtitle, error && styles.subtitleError]}>
-          {error ? 'Wrong PIN. Try again.' : 'Enter PIN to continue'}
+        <Text style={styles.appName}>AnVy</Text>
+        {mode !== 'enter' && (
+          <Text style={styles.modeLabel}>
+            {mode === 'setup_new' ? 'Create PIN' : 'Confirm PIN'}
+          </Text>
+        )}
+        <Text style={[styles.subtitle, subtitleIsError && styles.subtitleError]}>
+          {subtitle}
         </Text>
       </View>
 
@@ -90,7 +132,7 @@ export default function LockScreen() {
             style={[
               styles.pinDot,
               i < pin.length && styles.pinDotFilled,
-              error && styles.pinDotError,
+              subtitleIsError && styles.pinDotError,
             ]}
           />
         ))}
@@ -113,15 +155,13 @@ export default function LockScreen() {
         ))}
       </View>
 
-      {/* Biometric */}
-      {hasBiometric && (
+      {/* Biometric — only on enter mode */}
+      {hasBiometric && mode === 'enter' && (
         <TouchableOpacity style={styles.bioBtn} onPress={onBiometric}>
           <Text style={styles.bioIcon}>👆</Text>
           <Text style={styles.bioLabel}>Use Fingerprint</Text>
         </TouchableOpacity>
       )}
-
-      <Text style={styles.hint}>Demo PIN: 1234</Text>
     </View>
   );
 }
@@ -141,9 +181,16 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     marginBottom: 8,
   },
+  modeLabel: {
+    fontFamily: 'Sora_700Bold',
+    fontSize: 16,
+    color: Colors.neonBlue,
+    marginBottom: 4,
+  },
   subtitle: {
     ...Typography.bodyM,
     color: Colors.textMuted,
+    textAlign: 'center',
   },
   subtitleError: { color: Colors.red },
   dotsRow: {
@@ -207,11 +254,5 @@ const styles = StyleSheet.create({
   bioLabel: {
     ...Typography.bodyM,
     color: Colors.neonBlue,
-  },
-  hint: {
-    marginTop: 24,
-    fontSize: 12,
-    color: Colors.textMuted,
-    fontFamily: 'Sora_400Regular',
   },
 });
