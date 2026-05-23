@@ -14,12 +14,13 @@ export interface Conversation {
   contact: string;
   avatar: string;
   avatarColor: string;
-  date: string;           // ISO string
+  date: string;
   durationSeconds: number;
-  durationLabel: string;  // "14:22"
+  durationLabel: string;
   tag: string;
   tagColor: string;
   starred: boolean;
+  hidden?: boolean;
   audioFilePath?: string;
   transcript: string;
   summary: ConversationSummary;
@@ -38,6 +39,7 @@ export const DEMO_CONVERSATIONS: Conversation[] = [
     tag: 'Family',
     tagColor: '#FF6B6B',
     starred: true,
+    hidden: false,
     transcript: `Hi Priya, thanks for calling. So we were discussing the Shimla trip, right? Yes, I confirmed with the hotel — Royal Palace Inn, check-in on June 14th. We need to book train tickets by this weekend otherwise prices go up. Rajeev is coming too, he confirmed yesterday. Oh and don't forget — Maa's birthday is June 12th, we should plan something small before we leave. Also you mentioned you had some savings left from last month, maybe we can use that for the trip expenses. Okay, I'll share the hotel booking confirmation on WhatsApp. Take care, bye.`,
     summary: {
       keyPoints: [
@@ -71,6 +73,7 @@ export const DEMO_CONVERSATIONS: Conversation[] = [
     tag: 'Work',
     tagColor: '#00D4AA',
     starred: false,
+    hidden: false,
     transcript: `Hey Vikram. So the client presentation is on Friday 3 PM. I'll handle the financial slides, you take care of the product demo section. They want quarterly projections added — Ananya said that's mandatory. Budget approved is 2.4 crore, not 2 crore as earlier. Also we need to loop in Sanjay from legal before we send the contract. Deadline for the draft is tomorrow 5 PM. If I'm late just ping me on Slack. Okay great, talk soon.`,
     summary: {
       keyPoints: [
@@ -101,6 +104,7 @@ export const DEMO_CONVERSATIONS: Conversation[] = [
     tag: 'Friend',
     tagColor: '#A29BFE',
     starred: true,
+    hidden: false,
     transcript: `Hey! So yes, the movie is confirmed — Kalki 2898 AD, Sunday 7 PM at PVR Nexus. Rohit is coming, Sneha might join if she finishes her project. Book 4 tickets just in case. Oh and bring your jacket, the AC there is brutal. After movie we're going to Social for dinner — they have that new cocktail menu, I already made a reservation for 10 PM. Don't be late this time please! Also happy early birthday by the way — 25 looks good on you ha ha.`,
     summary: {
       keyPoints: [
@@ -128,6 +132,7 @@ export const DEMO_CONVERSATIONS: Conversation[] = [
     tag: 'Health',
     tagColor: '#FD79A8',
     starred: false,
+    hidden: false,
     transcript: `Good morning doctor. So my report came back normal — thyroid is fine, B12 is slightly low. He recommended Methylcobalamin 500mcg daily for 3 months. Also reduce screen time before bed, that's affecting sleep. Follow-up appointment in 6 weeks — June 29th at 11 AM. He said if I feel fatigued continue the iron tabs along with the B12. Drink more water. My BP was 118/76 which is good.`,
     summary: {
       keyPoints: [
