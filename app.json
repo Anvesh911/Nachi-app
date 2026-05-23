@@ -12,7 +12,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#070B14"
     },
-    "scheme": "nachi",
+    "scheme": "anvy",
     "platforms": ["android"],
     "android": {
       "package": "com.anveshnachi.anvy",
@@ -47,13 +47,13 @@
       [
         "expo-av",
         {
-          "microphonePermission": "Allow Nachi to record conversations."
+          "microphonePermission": "Allow AnVy to record conversations."
         }
       ],
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Allow Nachi to use Face ID."
+          "faceIDPermission": "Allow AnVy to use Face ID."
         }
       ],
       [
