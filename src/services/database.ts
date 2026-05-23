@@ -8,7 +8,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
-  db = await SQLite.openDatabaseAsync('nachi.db');
+  db = await SQLite.openDatabaseAsync('anvy.db');
   await initSchema(db);
   return db;
 }
@@ -28,6 +28,7 @@ async function initSchema(database: SQLite.SQLiteDatabase): Promise<void> {
       tag TEXT DEFAULT 'General',
       tag_color TEXT DEFAULT '#636e72',
       starred INTEGER DEFAULT 0,
+      hidden INTEGER DEFAULT 0,
       audio_file_path TEXT,
       transcript TEXT DEFAULT '',
       summary_json TEXT DEFAULT '{}',
@@ -46,7 +47,13 @@ async function initSchema(database: SQLite.SQLiteDatabase): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_conversations_date ON conversations(date DESC);
     CREATE INDEX IF NOT EXISTS idx_conversations_starred ON conversations(starred);
+    CREATE INDEX IF NOT EXISTS idx_conversations_hidden ON conversations(hidden);
   `);
+
+  // Migration: add hidden column if user already has old DB installed
+  try {
+    await database.execAsync(`ALTER TABLE conversations ADD COLUMN hidden INTEGER DEFAULT 0`);
+  } catch (_) { /* column already exists — safe to ignore */ }
 }
 
 export async function insertConversation(conv: Conversation): Promise<void> {
@@ -54,22 +61,36 @@ export async function insertConversation(conv: Conversation): Promise<void> {
   await database.runAsync(
     `INSERT OR REPLACE INTO conversations
       (id, contact, avatar, avatar_color, date, duration_seconds, duration_label,
-       tag, tag_color, starred, audio_file_path, transcript, summary_json, topics)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       tag, tag_color, starred, hidden, audio_file_path, transcript, summary_json, topics)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       conv.id, conv.contact, conv.avatar, conv.avatarColor,
       conv.date, conv.durationSeconds, conv.durationLabel,
-      conv.tag, conv.tagColor, conv.starred ? 1 : 0,
-      conv.audioFilePath ?? null, conv.transcript,
-      JSON.stringify(conv.summary), JSON.stringify(conv.topics),
+      conv.tag, conv.tagColor,
+      conv.starred ? 1 : 0,
+      conv.hidden ? 1 : 0,
+      conv.audioFilePath ?? null,
+      conv.transcript,
+      JSON.stringify(conv.summary),
+      JSON.stringify(conv.topics),
     ]
   );
 }
 
+// Only returns non-hidden conversations
 export async function getAllConversations(): Promise<Conversation[]> {
   const database = await getDatabase();
   const rows = await database.getAllAsync<any>(
-    `SELECT * FROM conversations ORDER BY date DESC`
+    `SELECT * FROM conversations WHERE hidden = 0 ORDER BY date DESC`
+  );
+  return rows.map(rowToConversation);
+}
+
+// Only returns hidden conversations
+export async function getHiddenConversations(): Promise<Conversation[]> {
+  const database = await getDatabase();
+  const rows = await database.getAllAsync<any>(
+    `SELECT * FROM conversations WHERE hidden = 1 ORDER BY date DESC`
   );
   return rows.map(rowToConversation);
 }
@@ -79,7 +100,7 @@ export async function searchConversations(query: string): Promise<Conversation[]
   const q = `%${query}%`;
   const rows = await database.getAllAsync<any>(
     `SELECT * FROM conversations
-     WHERE contact LIKE ? OR transcript LIKE ? OR topics LIKE ?
+     WHERE hidden = 0 AND (contact LIKE ? OR transcript LIKE ? OR topics LIKE ?)
      ORDER BY date DESC`,
     [q, q, q]
   );
@@ -91,6 +112,14 @@ export async function updateStarred(id: string, starred: boolean): Promise<void>
   await database.runAsync(
     `UPDATE conversations SET starred = ? WHERE id = ?`,
     [starred ? 1 : 0, id]
+  );
+}
+
+export async function updateHidden(id: string, hidden: boolean): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `UPDATE conversations SET hidden = ? WHERE id = ?`,
+    [hidden ? 1 : 0, id]
   );
 }
 
@@ -121,9 +150,10 @@ function rowToConversation(row: any): Conversation {
     tag: row.tag,
     tagColor: row.tag_color,
     starred: row.starred === 1,
+    hidden: row.hidden === 1,
     audioFilePath: row.audio_file_path ?? undefined,
     transcript: row.transcript ?? '',
-    summary: JSON.parse(row.summary_json ?? '{}'),
-    topics: JSON.parse(row.topics ?? '[]'),
+    summary: (() => { try { return JSON.parse(row.summary_json ?? '{}'); } catch { return {}; } })(),
+    topics: (() => { try { return JSON.parse(row.topics ?? '[]'); } catch { return []; } })(),
   };
 }
