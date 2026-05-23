@@ -14,7 +14,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors, Typography, Spacing, Radius } from '../../src/theme';
+import { useColors, Typography, Spacing, Radius } from '../../src/theme';
 import { useStore } from '../../src/store/useStore';
 import {
   ConvCard, Avatar, LiveDot, SectionLabel,
@@ -26,6 +26,7 @@ const ALL_TAGS = ['All', 'Work', 'Family', 'Friend', 'Health', 'General'];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const C      = useColors();
   const {
     loadConversations, isLoading,
     searchQuery, setSearchQuery,
@@ -39,7 +40,6 @@ export default function HomeScreen() {
 
   useEffect(() => { loadConversations(); }, []);
 
-  // Apply tag + search filter from store, then apply date filter on top
   const filtered = applyDateFilter(getFiltered(), dateFilter);
   const starred  = conversations.filter((c) => c.starred);
 
@@ -49,13 +49,9 @@ export default function HomeScreen() {
 
   function onLongPressConv(item: Conversation) {
     Alert.alert(item.contact, 'What do you want to do?', [
+      { text: 'Hide Conversation', onPress: () => hideConversation(item.id) },
       {
-        text: 'Hide Conversation',
-        onPress: () => hideConversation(item.id),
-      },
-      {
-        text: 'Delete',
-        style: 'destructive',
+        text: 'Delete', style: 'destructive',
         onPress: () =>
           Alert.alert('Delete', 'Delete this conversation permanently?', [
             { text: 'Cancel', style: 'cancel' },
@@ -80,25 +76,26 @@ export default function HomeScreen() {
   );
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: C.background, paddingTop: insets.top }]}>
+
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>GOOD DAY</Text>
-          <Text style={styles.appName}>
-            AnVy <Text style={{ color: Colors.neonBlue }}>·</Text>
+          <Text style={[styles.greeting, { color: C.textMuted }]}>GOOD DAY</Text>
+          <Text style={[styles.appName, { color: C.textPrimary }]}>
+            AnVy <Text style={{ color: C.neonBlue }}>·</Text>
           </Text>
         </View>
         <LiveDot />
       </View>
 
       {/* Search bar */}
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: C.surface, borderColor: C.border }]}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: C.textSecondary }]}
           placeholder='Search "trip", "birthday", "movie"...'
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={C.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
           returnKeyType="search"
@@ -106,7 +103,7 @@ export default function HomeScreen() {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
-            <Text style={styles.clearBtn}>✕</Text>
+            <Text style={[styles.clearBtn, { color: C.textMuted }]}>✕</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -122,9 +119,16 @@ export default function HomeScreen() {
           <TouchableOpacity
             key={tag}
             onPress={() => setFilterTag(tag)}
-            style={[styles.tag, filterTag === tag && styles.tagActive]}
+            style={[
+              styles.tag,
+              { borderColor: C.border },
+              filterTag === tag && { borderColor: C.neonBlue, backgroundColor: C.neonBlue + '18' },
+            ]}
           >
-            <Text style={[styles.tagText, filterTag === tag && styles.tagTextActive]}>
+            <Text style={[
+              styles.tagText,
+              { color: filterTag === tag ? C.neonBlue : C.textMuted },
+            ]}>
               {tag}
             </Text>
           </TouchableOpacity>
@@ -146,15 +150,16 @@ export default function HomeScreen() {
             {starred.map((c) => (
               <TouchableOpacity
                 key={c.id}
-                style={styles.starredCard}
+                style={[styles.starredCard, { backgroundColor: C.surface, borderColor: C.border }]}
                 onPress={() => onPressConv(c.id)}
                 activeOpacity={0.75}
               >
                 <Avatar initials={c.avatar} color={c.avatarColor} size={36} />
-                <Text style={styles.starredName} numberOfLines={1}>{c.contact}</Text>
+                <Text style={[styles.starredName, { color: C.textPrimary }]} numberOfLines={1}>
+                  {c.contact}
+                </Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={[styles.starredTag, { color: c.tagColor }]}>{c.tag}</Text>
-                  {/* Star action directly on starred card */}
                   <TouchableOpacity onPress={() => toggleStar(c.id)} hitSlop={8}>
                     <Text style={{ fontSize: 14, opacity: c.starred ? 1 : 0.3 }}>⭐</Text>
                   </TouchableOpacity>
@@ -171,7 +176,7 @@ export default function HomeScreen() {
           label={searchQuery ? `Results for "${searchQuery}"` : 'Recent Conversations'}
           count={filtered.length}
         />
-        <Text style={styles.hint}>Long-press to hide or delete</Text>
+        <Text style={[styles.hint, { color: C.textMuted }]}>Long-press to hide or delete</Text>
         <FlashList
           data={filtered}
           renderItem={renderItem}
@@ -183,13 +188,13 @@ export default function HomeScreen() {
             <RefreshControl
               refreshing={isLoading}
               onRefresh={loadConversations}
-              tintColor={Colors.neonBlue}
+              tintColor={C.neonBlue}
             />
           }
           ListEmptyComponent={
             <View style={styles.empty}>
               <Text style={styles.emptyIcon}>🌙</Text>
-              <Text style={styles.emptyText}>
+              <Text style={[styles.emptyText, { color: C.textMuted }]}>
                 {searchQuery
                   ? `No conversations found for "${searchQuery}"`
                   : dateFilter !== 'all'
@@ -205,40 +210,33 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
+  root: { flex: 1 },
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'flex-end', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.lg,
   },
-  greeting: { ...Typography.label, color: Colors.textMuted, marginBottom: 2 },
-  appName: { ...Typography.displayM, color: Colors.textPrimary },
+  greeting: { ...Typography.label, marginBottom: 2 },
+  appName: { ...Typography.displayM },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border,
+    borderRadius: Radius.lg, borderWidth: 1,
     marginHorizontal: Spacing.xl, marginBottom: Spacing.md,
     paddingHorizontal: Spacing.md, paddingVertical: 10, gap: 10,
   },
   searchIcon: { fontSize: 16 },
-  searchInput: { flex: 1, color: Colors.textSecondary, fontFamily: 'Sora_400Regular', fontSize: 13 },
-  clearBtn: { color: Colors.textMuted, fontSize: 16 },
+  searchInput: { flex: 1, fontFamily: 'Sora_400Regular', fontSize: 13 },
+  clearBtn: { fontSize: 16 },
   tagsScroll: { maxHeight: 44 },
   tagsContent: { paddingHorizontal: Spacing.xl, gap: 8, paddingBottom: 8 },
-  tag: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
-  tagActive: { borderColor: Colors.neonBlue, backgroundColor: Colors.neonBlue + '18' },
-  tagText: { fontSize: 12, fontFamily: 'Sora_600SemiBold', color: Colors.textMuted },
-  tagTextActive: { color: Colors.neonBlue },
+  tag: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1 },
+  tagText: { fontSize: 12, fontFamily: 'Sora_600SemiBold' },
   starredSection: { paddingHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: Spacing.md },
-  starredCard: {
-    width: 140, backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.border,
-    borderRadius: Radius.lg, padding: 14, gap: 8,
-  },
-  starredName: { ...Typography.headingS, color: Colors.textPrimary },
+  starredCard: { width: 140, borderWidth: 1, borderRadius: Radius.lg, padding: 14, gap: 8 },
+  starredName: { ...Typography.headingS },
   starredTag: { fontSize: 11, fontFamily: 'Sora_400Regular' },
   listContainer: { flex: 1, paddingHorizontal: Spacing.xl, marginTop: Spacing.lg },
-  hint: { fontSize: 10, color: Colors.textMuted, fontFamily: 'Sora_400Regular', marginBottom: Spacing.sm, marginTop: -8 },
+  hint: { fontSize: 10, fontFamily: 'Sora_400Regular', marginBottom: Spacing.sm, marginTop: -8 },
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { ...Typography.bodyM, color: Colors.textMuted, textAlign: 'center' },
+  emptyText: { ...Typography.bodyM, textAlign: 'center' },
 });
