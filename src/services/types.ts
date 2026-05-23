@@ -1,13 +1,49 @@
 // src/services/types.ts
 
+// ─── Reminder ─────────────────────────────────────────────────────────────────
+
+export interface Reminder {
+  id: string;
+  conversationId: string;
+  title: string;
+  notes?: string;
+  scheduledDate: string; // ISO string
+  repeat: 'none' | 'daily' | 'weekly' | 'monthly';
+  completed: boolean;
+  notificationId?: string; // expo-notifications ID
+  createdAt: string;
+}
+
+// ─── Editable Summary ─────────────────────────────────────────────────────────
+
+export interface Task {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
+export interface DatePlan {
+  id: string;
+  title: string;
+  date: string;
+  time?: string;
+  location?: string;
+}
+
 export interface ConversationSummary {
   keyPoints: string[];
-  promises: string[];
-  dates: string[];
+  promises: string[];   // kept for backward compat
+  tasks: Task[];        // new editable checklist
+  dates: string[];      // kept for backward compat
+  datePlans: DatePlan[]; // new editable date plans
   reminders: string[];
   tone: string;
   toneEmoji: string;
+  toneDescription?: string;
+  tags: string[];       // editable tags
 }
+
+// ─── Conversation ─────────────────────────────────────────────────────────────
 
 export interface Conversation {
   id: string;
@@ -26,6 +62,18 @@ export interface Conversation {
   summary: ConversationSummary;
   topics: string[];
 }
+
+// ─── Storage Info ─────────────────────────────────────────────────────────────
+
+export interface StorageInfo {
+  totalBytes: number;
+  recordingsBytes: number;
+  transcriptBytes: number;
+  cacheBytes: number;
+  remindersBytes: number;
+}
+
+// ─── Demo Data ────────────────────────────────────────────────────────────────
 
 export const DEMO_CONVERSATIONS: Conversation[] = [
   {
@@ -52,13 +100,23 @@ export const DEMO_CONVERSATIONS: Conversation[] = [
         'Share hotel booking confirmation on WhatsApp',
         'Book train tickets before weekend',
       ],
+      tasks: [
+        { id: 't1', text: 'Share hotel booking confirmation on WhatsApp', completed: false },
+        { id: 't2', text: 'Book train tickets before weekend', completed: false },
+      ],
       dates: ["June 12 – Maa's birthday", 'June 14 – Hotel check-in'],
+      datePlans: [
+        { id: 'dp1', title: "Maa's Birthday", date: '2026-06-12', time: '' },
+        { id: 'dp2', title: 'Hotel Check-in', date: '2026-06-14', time: '' },
+      ],
       reminders: [
         "Plan something for Maa's birthday before trip",
         "Use last month's savings for trip expenses",
       ],
       tone: 'Warm & planning-focused',
       toneEmoji: '🤝',
+      toneDescription: 'Friendly and collaborative conversation',
+      tags: ['trip', 'birthday', 'hotel', 'train'],
     },
     topics: ['trip', 'birthday', 'hotel', 'train', 'rajeev'],
   },
@@ -86,10 +144,21 @@ export const DEMO_CONVERSATIONS: Conversation[] = [
         'Send contract draft by tomorrow 5 PM',
         'Loop in Sanjay from legal before contract',
       ],
+      tasks: [
+        { id: 't1', text: 'Send contract draft by tomorrow 5 PM', completed: false },
+        { id: 't2', text: 'Loop in Sanjay from legal before contract', completed: false },
+        { id: 't3', text: 'Add quarterly projections to slides', completed: false },
+      ],
       dates: ['Friday 3 PM – Client presentation', 'Tomorrow 5 PM – Contract draft deadline'],
+      datePlans: [
+        { id: 'dp1', title: 'Client Presentation', date: '', time: '3:00 PM' },
+        { id: 'dp2', title: 'Contract Draft Deadline', date: '', time: '5:00 PM' },
+      ],
       reminders: ['Ping on Slack if late', 'Add quarterly projections to slides'],
       tone: 'Professional & urgent',
       toneEmoji: '💼',
+      toneDescription: 'Focused and deadline-driven',
+      tags: ['presentation', 'client', 'contract', 'budget'],
     },
     topics: ['presentation', 'client', 'contract', 'budget', 'friday'],
   },
@@ -114,10 +183,20 @@ export const DEMO_CONVERSATIONS: Conversation[] = [
         'Dinner at Social after, 10 PM reservation',
       ],
       promises: ['Book 4 tickets', "Don't be late"],
+      tasks: [
+        { id: 't1', text: 'Book 4 movie tickets', completed: false },
+        { id: 't2', text: "Don't be late to movie", completed: false },
+      ],
       dates: ['Sunday 7 PM – Movie', 'Sunday 10 PM – Dinner at Social'],
+      datePlans: [
+        { id: 'dp1', title: 'Movie at PVR Nexus', date: '', time: '7:00 PM', location: 'PVR Nexus' },
+        { id: 'dp2', title: 'Dinner at Social', date: '', time: '10:00 PM', location: 'Social' },
+      ],
       reminders: ['Bring jacket (AC is cold)', 'Plan for actual birthday too'],
       tone: 'Fun & excited',
       toneEmoji: '🎉',
+      toneDescription: 'Cheerful and celebratory',
+      tags: ['movie', 'birthday', 'dinner', 'friends'],
     },
     topics: ['movie', 'birthday', 'dinner', 'sunday', 'pvr', 'rohit'],
   },
@@ -142,10 +221,20 @@ export const DEMO_CONVERSATIONS: Conversation[] = [
         'Reduce screen time before bed',
       ],
       promises: ['Take B12 supplement for 3 months'],
+      tasks: [
+        { id: 't1', text: 'Take B12 supplement daily for 3 months', completed: false },
+        { id: 't2', text: 'Continue iron tabs if fatigued', completed: false },
+        { id: 't3', text: 'Drink more water', completed: false },
+      ],
       dates: ['June 29, 11 AM – Follow-up appointment'],
+      datePlans: [
+        { id: 'dp1', title: 'Follow-up Appointment', date: '2026-06-29', time: '11:00 AM' },
+      ],
       reminders: ['Continue iron tabs if fatigued', 'Drink more water', 'Reduce screen time at night'],
       tone: 'Informational & calm',
       toneEmoji: '🏥',
+      toneDescription: 'Medical and informative tone',
+      tags: ['health', 'doctor', 'medicine', 'appointment'],
     },
     topics: ['doctor', 'health', 'b12', 'appointment', 'medicine'],
   },
