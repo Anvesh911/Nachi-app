@@ -1,40 +1,49 @@
 // src/services/authService.ts
-// Converted from Flutter local_auth + SharedPreferences → expo-local-authentication + expo-secure-store
 
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 
-const PIN_KEY = 'nachi_pin';
-const DEFAULT_PIN = '1234';
+const PIN_KEY     = 'anvy_pin';
+const PIN_SET_KEY = 'anvy_pin_set';
 
-export async function getStoredPin(): Promise<string> {
+export async function isPinSet(): Promise<boolean> {
   try {
-    const pin = await SecureStore.getItemAsync(PIN_KEY);
-    return pin ?? DEFAULT_PIN;
+    const val = await SecureStore.getItemAsync(PIN_SET_KEY);
+    return val === '1';
   } catch {
-    return DEFAULT_PIN;
+    return false;
   }
 }
 
 export async function savePin(pin: string): Promise<void> {
   await SecureStore.setItemAsync(PIN_KEY, pin);
+  await SecureStore.setItemAsync(PIN_SET_KEY, '1');
 }
 
 export async function verifyPin(input: string): Promise<boolean> {
-  const stored = await getStoredPin();
-  return input === stored;
+  try {
+    const stored = await SecureStore.getItemAsync(PIN_KEY);
+    return stored !== null && input === stored;
+  } catch {
+    return false;
+  }
+}
+
+export async function clearPin(): Promise<void> {
+  await SecureStore.deleteItemAsync(PIN_KEY);
+  await SecureStore.deleteItemAsync(PIN_SET_KEY);
 }
 
 export async function isBiometricAvailable(): Promise<boolean> {
   const compatible = await LocalAuthentication.hasHardwareAsync();
-  const enrolled = await LocalAuthentication.isEnrolledAsync();
+  const enrolled   = await LocalAuthentication.isEnrolledAsync();
   return compatible && enrolled;
 }
 
 export async function authenticateWithBiometric(): Promise<boolean> {
   try {
     const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Unlock Nachi',
+      promptMessage: 'Unlock AnVy',
       fallbackLabel: 'Use PIN',
       cancelLabel: 'Cancel',
       disableDeviceFallback: false,
