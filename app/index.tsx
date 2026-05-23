@@ -58,12 +58,12 @@ export default function SplashRoute() {
             colors={['#0D2040', '#0A1628']}
             style={styles.iconBox}
           >
-            <Text style={styles.icon}>🎙️</Text>
+            <Text style={styles.icon}>🌙</Text>
           </LinearGradient>
         </Animated.View>
 
-        <Text style={styles.appName}>Nachi</Text>
-        <Text style={styles.tagline}>CALL MEMORY · PRIVATE</Text>
+        <Text style={styles.appName}>AnVy</Text>
+        <Text style={styles.tagline}>CONVERSATION MEMORY · PRIVATE</Text>
 
         <View style={styles.dots}>
           {[0, 1, 2].map((i) => (
