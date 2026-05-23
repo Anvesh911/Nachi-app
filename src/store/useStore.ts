@@ -17,7 +17,6 @@ interface StoreState {
   searchQuery: string;
   filterTag: string;
 
-  // Actions
   loadConversations: () => Promise<void>;
   addConversation: (conv: Conversation) => Promise<void>;
   toggleStar: (id: string) => Promise<void>;
@@ -38,7 +37,6 @@ export const useStore = create<StoreState>((set, get) => ({
     set({ isLoading: true });
     try {
       const rows = await getAllConversations();
-      // If DB is empty on first launch, seed demo data
       if (rows.length === 0) {
         await get().seedDemoData();
       } else {
@@ -51,10 +49,15 @@ export const useStore = create<StoreState>((set, get) => ({
   },
 
   seedDemoData: async () => {
-    for (const conv of DEMO_CONVERSATIONS) {
-      await insertConversation(conv);
+    try {
+      for (const conv of DEMO_CONVERSATIONS) {
+        await insertConversation(conv);
+      }
+      set({ conversations: DEMO_CONVERSATIONS, isLoading: false });
+    } catch (e) {
+      console.error('seedDemoData error:', e);
+      set({ conversations: [], isLoading: false });
     }
-    set({ conversations: DEMO_CONVERSATIONS, isLoading: false });
   },
 
   addConversation: async (conv) => {
@@ -74,11 +77,17 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
   },
 
+  // Fix: DB delete happens FIRST before state update
+  // This ensures deleted conversations never return on app restart
   removeConversation: async (id) => {
-    await deleteConversation(id);
-    set((s) => ({
-      conversations: s.conversations.filter((c) => c.id !== id),
-    }));
+    try {
+      await deleteConversation(id); // DB first
+      set((s) => ({
+        conversations: s.conversations.filter((c) => c.id !== id),
+      }));
+    } catch (e) {
+      console.error('removeConversation error:', e);
+    }
   },
 
   setSearchQuery: (q) => set({ searchQuery: q }),
