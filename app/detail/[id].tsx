@@ -2,52 +2,53 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Share,
-  Alert,
-  Animated,
+  View, Text, TouchableOpacity, ScrollView, StyleSheet,
+  Share, Alert, Animated, TextInput, Modal,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
-import { Colors, Typography, Spacing, Radius } from '../../src/theme';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useColors, Typography, Spacing, Radius } from '../../src/theme';
 import { useStore } from '../../src/store/useStore';
 import { Avatar, TagBadge, GlassCard } from '../../src/components';
-import { Conversation } from '../../src/services/types';
+import { Conversation, Reminder, Task, DatePlan } from '../../src/services/types';
 import { format } from 'date-fns';
 
 type DetailTab = 'summary' | 'transcript' | 'reminders';
 
+const MOOD_OPTIONS = [
+  { emoji: '🤝', label: 'Collaborative' },
+  { emoji: '💼', label: 'Professional' },
+  { emoji: '🎉', label: 'Fun & Excited' },
+  { emoji: '🏥', label: 'Medical' },
+  { emoji: '❤️', label: 'Warm' },
+  { emoji: '😔', label: 'Emotional' },
+  { emoji: '😡', label: 'Tense' },
+  { emoji: '😐', label: 'Neutral' },
+];
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function DetailScreen() {
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const insets = useSafeAreaInsets();
+  const C      = useColors();
   const { conversations, toggleStar, removeConversation } = useStore();
-  const conv = conversations.find((c) => c.id === id);
+  const conv   = conversations.find((c) => c.id === id);
 
-  // Support deep-linking to a specific tab from SavedModal
   const initialTab: DetailTab =
     tab === 'transcript' ? 'transcript' :
     tab === 'reminders'  ? 'reminders'  : 'summary';
 
-  const [activeTab, setActiveTab]     = useState<DetailTab>(initialTab);
-  const [isPlaying, setIsPlaying]     = useState(false);
+  const [activeTab, setActiveTab]       = useState<DetailTab>(initialTab);
+  const [isPlaying, setIsPlaying]       = useState(false);
   const [playProgress, setPlayProgress] = useState(0);
-  const [exported, setExported]       = useState(false);
+  const [exported, setExported]         = useState(false);
 
   const soundRef         = useRef<Audio.Sound | null>(null);
   const progressInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const tabAnim          = useRef(new Animated.Value(0)).current;
   const TABS: DetailTab[] = ['summary', 'transcript', 'reminders'];
-
-  useEffect(() => {
-    const idx = TABS.indexOf(activeTab);
-    Animated.spring(tabAnim, { toValue: idx, useNativeDriver: true, friction: 8 }).start();
-  }, [activeTab]);
 
   useEffect(() => {
     return () => {
@@ -58,13 +59,13 @@ export default function DetailScreen() {
 
   if (!conv) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
+      <View style={[styles.root, { backgroundColor: C.background, paddingTop: insets.top }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>‹</Text>
+          <Text style={[styles.backIcon, { color: C.neonBlue }]}>‹</Text>
         </TouchableOpacity>
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>❓</Text>
-          <Text style={styles.emptyText}>Conversation not found.</Text>
+          <Text style={[styles.emptyText, { color: C.textMuted }]}>Conversation not found.</Text>
         </View>
       </View>
     );
@@ -76,44 +77,32 @@ export default function DetailScreen() {
         setIsPlaying(false);
         if (progressInterval.current) clearInterval(progressInterval.current);
       } else {
-        setIsPlaying(true);
-        setPlayProgress(0);
+        setIsPlaying(true); setPlayProgress(0);
         progressInterval.current = setInterval(() => {
           setPlayProgress((p) => {
-            if (p >= 1) {
-              setIsPlaying(false);
-              if (progressInterval.current) clearInterval(progressInterval.current);
-              return 0;
-            }
+            if (p >= 1) { setIsPlaying(false); if (progressInterval.current) clearInterval(progressInterval.current); return 0; }
             return p + 0.003;
           });
         }, 50);
       }
       return;
     }
-
     if (isPlaying) {
       await soundRef.current?.pauseAsync();
       setIsPlaying(false);
       if (progressInterval.current) clearInterval(progressInterval.current);
     } else {
       if (!soundRef.current) {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: conv.audioFilePath },
-          { shouldPlay: true }
-        );
+        const { sound } = await Audio.Sound.createAsync({ uri: conv.audioFilePath }, { shouldPlay: true });
         soundRef.current = sound;
         sound.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded) {
-            const prog = status.durationMillis
-              ? status.positionMillis / status.durationMillis : 0;
+            const prog = status.durationMillis ? status.positionMillis / status.durationMillis : 0;
             setPlayProgress(prog);
             if (status.didJustFinish) { setIsPlaying(false); setPlayProgress(0); }
           }
         });
-      } else {
-        await soundRef.current.playAsync();
-      }
+      } else { await soundRef.current.playAsync(); }
       setIsPlaying(true);
     }
   }
@@ -122,210 +111,528 @@ export default function DetailScreen() {
     const text =
       `AnVy — Conversation with ${conv.contact}\n` +
       `Date: ${format(new Date(conv.date), 'dd MMM yyyy, hh:mm a')}\n` +
-      `Duration: ${conv.durationLabel}\n` +
-      `Tag: ${conv.tag}\n\n` +
+      `Duration: ${conv.durationLabel} · Tag: ${conv.tag}\n\n` +
       `=== TRANSCRIPT ===\n${conv.transcript}\n\n` +
-      `=== AI SUMMARY ===\n` +
+      `=== SUMMARY ===\n` +
       `Key Points:\n${conv.summary.keyPoints.map((p) => `• ${p}`).join('\n')}\n\n` +
-      `Promises:\n${conv.summary.promises.map((p) => `□ ${p}`).join('\n')}\n\n` +
+      `Tasks:\n${(conv.summary.tasks ?? []).map((t) => `${t.completed ? '✓' : '□'} ${t.text}`).join('\n')}\n\n` +
       `Dates:\n${conv.summary.dates.map((d) => `◆ ${d}`).join('\n')}\n\n` +
       `Reminders:\n${conv.summary.reminders.map((r) => `→ ${r}`).join('\n')}`;
-
     await Share.share({ message: text, title: `AnVy — ${conv.contact}` });
     setExported(true);
     setTimeout(() => setExported(false), 2000);
   }
 
   async function handleDelete() {
-    Alert.alert(
-      'Delete Conversation',
-      `Delete conversation with ${conv.contact}? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete', style: 'destructive',
-          onPress: async () => { await removeConversation(conv.id); router.back(); },
-        },
-      ]
-    );
+    Alert.alert('Delete Conversation', `Delete conversation with ${conv.contact}? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => { await removeConversation(conv.id); router.back(); } },
+    ]);
   }
 
   const dateStr = format(new Date(conv.date), 'dd MMM yyyy');
   const timeStr = format(new Date(conv.date), 'hh:mm a');
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: C.background, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>‹</Text>
+          <Text style={[styles.backIcon, { color: C.neonBlue }]}>‹</Text>
         </TouchableOpacity>
         <Avatar initials={conv.avatar} color={conv.avatarColor} size={36} />
         <View style={styles.headerMeta}>
-          <Text style={styles.headerName} numberOfLines={1}>{conv.contact}</Text>
-          <Text style={styles.headerSub}>{dateStr} · {timeStr} · {conv.durationLabel}</Text>
+          <Text style={[styles.headerName, { color: C.textPrimary }]} numberOfLines={1}>{conv.contact}</Text>
+          <Text style={[styles.headerSub, { color: C.textMuted }]}>{dateStr} · {timeStr} · {conv.durationLabel}</Text>
         </View>
-        {/* Star action in header */}
         <TouchableOpacity onPress={() => toggleStar(conv.id)} hitSlop={8}>
           <Text style={{ fontSize: 20, opacity: conv.starred ? 1 : 0.35 }}>⭐</Text>
         </TouchableOpacity>
-        {/* Share/export action in header */}
         <TouchableOpacity onPress={handleExport} hitSlop={8} style={{ marginLeft: 8 }}>
-          <Text style={{ fontSize: 18, color: Colors.neonBlue }}>⬆</Text>
+          <Text style={{ fontSize: 18, color: C.neonBlue }}>⬆</Text>
         </TouchableOpacity>
-        {/* Delete action in header */}
         <TouchableOpacity onPress={handleDelete} hitSlop={8} style={{ marginLeft: 8 }}>
-          <Text style={{ fontSize: 18, color: Colors.red }}>🗑</Text>
+          <Text style={{ fontSize: 18, color: C.red }}>🗑</Text>
         </TouchableOpacity>
       </View>
 
       {exported && (
-        <View style={styles.exportedBanner}>
-          <Text style={styles.exportedText}>✓ Transcript shared</Text>
+        <View style={[styles.exportedBanner, { backgroundColor: C.neonBlue + '22', borderColor: C.neonBlue + '44' }]}>
+          <Text style={[styles.exportedText, { color: C.neonBlue }]}>✓ Transcript shared</Text>
         </View>
       )}
 
       {/* Audio player */}
-      <View style={styles.player}>
-        <TouchableOpacity onPress={togglePlay} style={styles.playBtn}>
+      <View style={[styles.player, { backgroundColor: C.surface, borderColor: C.border }]}>
+        <TouchableOpacity onPress={togglePlay} style={[styles.playBtn, { backgroundColor: C.neonBlue }]}>
           <Text style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</Text>
         </TouchableOpacity>
         <View style={styles.playerTrack}>
-          <View style={styles.trackBg}>
-            <View style={[styles.trackFill, { width: `${playProgress * 100}%` }]} />
+          <View style={[styles.trackBg, { backgroundColor: C.border }]}>
+            <View style={[styles.trackFill, { backgroundColor: C.neonBlue, width: `${playProgress * 100}%` }]} />
           </View>
           <View style={styles.trackTimes}>
-            <Text style={styles.trackTime}>
-              {formatDur(Math.floor(playProgress * conv.durationSeconds))}
-            </Text>
-            <Text style={styles.trackTime}>{conv.durationLabel}</Text>
+            <Text style={[styles.trackTime, { color: C.textMuted }]}>{formatDur(Math.floor(playProgress * conv.durationSeconds))}</Text>
+            <Text style={[styles.trackTime, { color: C.textMuted }]}>{conv.durationLabel}</Text>
           </View>
         </View>
       </View>
 
       {/* Tab bar */}
-      <View style={styles.tabBar}>
-        {TABS.map((tab) => (
+      <View style={[styles.tabBar, { backgroundColor: C.surfaceVariant, borderColor: C.border }]}>
+        {TABS.map((t) => (
           <TouchableOpacity
-            key={tab}
+            key={t}
             style={styles.tabItem}
-            onPress={() => { setActiveTab(tab); Haptics.selectionAsync(); }}
+            onPress={() => { setActiveTab(t); Haptics.selectionAsync(); }}
           >
-            <Text style={[styles.tabLabel, activeTab === tab && styles.tabLabelActive]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            <Text style={[styles.tabLabel, { color: activeTab === t ? C.neonBlue : C.textMuted }]}>
+              {t.charAt(0).toUpperCase() + t.slice(1)}
             </Text>
-            {activeTab === tab && <View style={styles.tabUnderline} />}
+            {activeTab === t && <View style={[styles.tabUnderline, { backgroundColor: C.neonBlue }]} />}
           </TouchableOpacity>
         ))}
       </View>
 
       {/* Tab content */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={styles.tabContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
         {activeTab === 'summary'    && <SummaryTab conv={conv} onDelete={handleDelete} />}
         {activeTab === 'transcript' && <TranscriptTab conv={conv} />}
-        {activeTab === 'reminders'  && <RemindersTab conv={conv} onDelete={handleDelete} />}
+        {activeTab === 'reminders'  && <RemindersTab conv={conv} />}
       </ScrollView>
     </View>
   );
 }
 
-// ── Summary Tab ───────────────────────────────────────────────────────────────
+// ─── Summary Tab (fully editable) ────────────────────────────────────────────
 function SummaryTab({ conv, onDelete }: { conv: Conversation; onDelete: () => void }) {
+  const C = useColors();
+  const {
+    addKeyPoint, updateKeyPoint, deleteKeyPoint,
+    toggleTask, addTask, deleteTask, updateTask,
+    addDatePlan, deleteDatePlan,
+    updateTone, addTag, removeTag,
+  } = useStore();
+
+  const [newKeyPoint, setNewKeyPoint]   = useState('');
+  const [editKP, setEditKP]             = useState<{ index: number; text: string } | null>(null);
+  const [newTask, setNewTask]           = useState('');
+  const [editTask, setEditTask]         = useState<{ id: string; text: string } | null>(null);
+  const [newPlanTitle, setNewPlanTitle] = useState('');
+  const [newPlanDate, setNewPlanDate]   = useState('');
+  const [newPlanTime, setNewPlanTime]   = useState('');
+  const [newTag, setNewTag]             = useState('');
+  const [showMoodPicker, setShowMoodPicker] = useState(false);
+
+  const tags     = conv.summary.tags     ?? [];
+  const tasks    = conv.summary.tasks    ?? [];
+  const datePlans = conv.summary.datePlans ?? [];
+
   return (
     <>
-      {/* Tag displayed in summary */}
+      {/* Tag + date row */}
       <View style={styles.summaryTagRow}>
         <TagBadge label={conv.tag} color={conv.tagColor} />
-        <Text style={styles.summaryDate}>
-          {format(new Date(conv.date), 'dd MMM yyyy')}
-        </Text>
+        <Text style={[styles.summaryDate, { color: C.textMuted }]}>{format(new Date(conv.date), 'dd MMM yyyy')}</Text>
       </View>
 
-      <GlassCard title="🔑 Key Points" accentColor={Colors.neonBlue}>
+      {/* ── Key Points ── */}
+      <GlassCard title="🔑 Key Points" accentColor={C.neonBlue}>
         {conv.summary.keyPoints.map((p, i) => (
-          <View key={i} style={styles.bulletRow}>
-            <Text style={[styles.bullet, { color: Colors.neonBlue }]}>·</Text>
-            <Text style={styles.bulletText}>{p}</Text>
+          <View key={i} style={styles.editRow}>
+            {editKP?.index === i ? (
+              <TextInput
+                style={[styles.editInput, { color: C.textPrimary, borderColor: C.border }]}
+                value={editKP.text}
+                onChangeText={(t) => setEditKP({ index: i, text: t })}
+                onBlur={() => { updateKeyPoint(conv.id, i, editKP.text); setEditKP(null); }}
+                autoFocus
+              />
+            ) : (
+              <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditKP({ index: i, text: p })}>
+                <Text style={[styles.bulletText, { color: C.textSecondary }]}>· {p}</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => deleteKeyPoint(conv.id, i)} hitSlop={8}>
+              <Text style={{ color: C.red, fontSize: 16 }}>×</Text>
+            </TouchableOpacity>
           </View>
         ))}
+        <View style={styles.addRow}>
+          <TextInput
+            style={[styles.addInput, { color: C.textPrimary, borderColor: C.border }]}
+            placeholder="Add key point..."
+            placeholderTextColor={C.textMuted}
+            value={newKeyPoint}
+            onChangeText={setNewKeyPoint}
+          />
+          <TouchableOpacity
+            onPress={() => { if (newKeyPoint.trim()) { addKeyPoint(conv.id, newKeyPoint.trim()); setNewKeyPoint(''); } }}
+            style={[styles.addBtn, { backgroundColor: C.neonBlue }]}
+          >
+            <Text style={styles.addBtnText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </GlassCard>
 
-      <GlassCard title="🤝 Promises & Tasks" accentColor={Colors.purple}>
-        {conv.summary.promises.length ? conv.summary.promises.map((p, i) => (
-          <View key={i} style={styles.bulletRow}>
-            <Text style={[styles.bullet, { color: Colors.purple }]}>□</Text>
-            <Text style={styles.bulletText}>{p}</Text>
+      {/* ── Tasks (Promises) ── */}
+      <GlassCard title="✅ Tasks & Promises" accentColor={C.purple}>
+        {tasks.map((task) => (
+          <View key={task.id} style={styles.editRow}>
+            <TouchableOpacity onPress={() => toggleTask(conv.id, task.id)} style={{ marginRight: 8 }}>
+              <Text style={{ fontSize: 18 }}>{task.completed ? '☑' : '☐'}</Text>
+            </TouchableOpacity>
+            {editTask?.id === task.id ? (
+              <TextInput
+                style={[styles.editInput, { color: C.textPrimary, borderColor: C.border, flex: 1 }]}
+                value={editTask.text}
+                onChangeText={(t) => setEditTask({ id: task.id, text: t })}
+                onBlur={() => { updateTask(conv.id, task.id, editTask.text); setEditTask(null); }}
+                autoFocus
+              />
+            ) : (
+              <TouchableOpacity style={{ flex: 1 }} onPress={() => setEditTask({ id: task.id, text: task.text })}>
+                <Text style={[styles.bulletText, { color: C.textSecondary, textDecorationLine: task.completed ? 'line-through' : 'none' }]}>
+                  {task.text}
+                </Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity onPress={() => deleteTask(conv.id, task.id)} hitSlop={8}>
+              <Text style={{ color: C.red, fontSize: 16 }}>×</Text>
+            </TouchableOpacity>
           </View>
-        )) : <Text style={styles.mutedText}>No promises recorded</Text>}
+        ))}
+        <View style={styles.addRow}>
+          <TextInput
+            style={[styles.addInput, { color: C.textPrimary, borderColor: C.border }]}
+            placeholder="Add task..."
+            placeholderTextColor={C.textMuted}
+            value={newTask}
+            onChangeText={setNewTask}
+          />
+          <TouchableOpacity
+            onPress={() => { if (newTask.trim()) { addTask(conv.id, newTask.trim()); setNewTask(''); } }}
+            style={[styles.addBtn, { backgroundColor: C.purple }]}
+          >
+            <Text style={styles.addBtnText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </GlassCard>
 
-      <GlassCard title="📅 Dates & Plans" accentColor={Colors.orange}>
-        {conv.summary.dates.length ? conv.summary.dates.map((d, i) => (
-          <View key={i} style={styles.bulletRow}>
-            <Text style={[styles.bullet, { color: Colors.orange }]}>◆</Text>
-            <Text style={styles.bulletText}>{d}</Text>
+      {/* ── Date Plans ── */}
+      <GlassCard title="📅 Dates & Plans" accentColor={C.orange}>
+        {datePlans.map((plan) => (
+          <View key={plan.id} style={styles.editRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.bulletText, { color: C.textSecondary }]}>◆ {plan.title}</Text>
+              {(plan.date || plan.time) && (
+                <Text style={[styles.planSub, { color: C.textMuted }]}>
+                  {[plan.date, plan.time, plan.location].filter(Boolean).join(' · ')}
+                </Text>
+              )}
+            </View>
+            <TouchableOpacity onPress={() => deleteDatePlan(conv.id, plan.id)} hitSlop={8}>
+              <Text style={{ color: C.red, fontSize: 16 }}>×</Text>
+            </TouchableOpacity>
           </View>
-        )) : <Text style={styles.mutedText}>No dates recorded</Text>}
+        ))}
+        <View style={styles.addRow}>
+          <TextInput
+            style={[styles.addInput, { color: C.textPrimary, borderColor: C.border, flex: 1 }]}
+            placeholder="Title..."
+            placeholderTextColor={C.textMuted}
+            value={newPlanTitle}
+            onChangeText={setNewPlanTitle}
+          />
+          <TextInput
+            style={[styles.addInput, { color: C.textPrimary, borderColor: C.border, width: 80 }]}
+            placeholder="Date"
+            placeholderTextColor={C.textMuted}
+            value={newPlanDate}
+            onChangeText={setNewPlanDate}
+          />
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            if (newPlanTitle.trim()) {
+              addDatePlan(conv.id, { title: newPlanTitle.trim(), date: newPlanDate, time: newPlanTime });
+              setNewPlanTitle(''); setNewPlanDate(''); setNewPlanTime('');
+            }
+          }}
+          style={[styles.addBtn, { backgroundColor: C.orange, alignSelf: 'flex-end', marginTop: 6 }]}
+        >
+          <Text style={styles.addBtnText}>+ Add</Text>
+        </TouchableOpacity>
       </GlassCard>
 
-      <View style={styles.toneCard}>
-        <Text style={styles.toneLabel}>EMOTIONAL TONE</Text>
+      {/* ── Emotional Tone ── */}
+      <TouchableOpacity
+        style={[styles.toneCard, { backgroundColor: C.surface, borderColor: C.border }]}
+        onPress={() => setShowMoodPicker(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.toneLabel, { color: C.textMuted }]}>EMOTIONAL TONE  ✏️</Text>
         <Text style={styles.toneEmoji}>{conv.summary.toneEmoji}</Text>
-        <Text style={styles.toneName}>{conv.summary.tone}</Text>
+        <Text style={[styles.toneName, { color: C.textPrimary }]}>{conv.summary.tone}</Text>
+        {conv.summary.toneDescription ? (
+          <Text style={[styles.toneDesc, { color: C.textMuted }]}>{conv.summary.toneDescription}</Text>
+        ) : null}
+      </TouchableOpacity>
+
+      {/* Mood Picker Modal */}
+      <Modal visible={showMoodPicker} transparent animationType="fade" onRequestClose={() => setShowMoodPicker(false)}>
+        <View style={[styles.moodBackdrop]}>
+          <View style={[styles.moodCard, { backgroundColor: C.surface, borderColor: C.border }]}>
+            <Text style={[Typography.headingM, { color: C.textPrimary, marginBottom: 16 }]}>Select Mood</Text>
+            <View style={styles.moodGrid}>
+              {MOOD_OPTIONS.map((m) => (
+                <TouchableOpacity
+                  key={m.emoji}
+                  style={[styles.moodOption, { borderColor: C.border }]}
+                  onPress={() => { updateTone(conv.id, m.emoji, m.label); setShowMoodPicker(false); }}
+                >
+                  <Text style={{ fontSize: 28 }}>{m.emoji}</Text>
+                  <Text style={{ fontSize: 10, color: C.textMuted, fontFamily: 'Sora_400Regular', textAlign: 'center' }}>{m.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity onPress={() => setShowMoodPicker(false)} style={{ marginTop: 16, paddingVertical: 8 }}>
+              <Text style={{ color: C.textMuted, fontFamily: 'Sora_400Regular', fontSize: 13 }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Tags ── */}
+      <View style={[styles.tagsCard, { backgroundColor: C.surface, borderColor: C.border }]}>
+        <Text style={[styles.toneLabel, { color: C.textMuted }]}>TAGS</Text>
+        <View style={styles.tagsRow}>
+          {tags.map((t) => (
+            <TouchableOpacity
+              key={t}
+              style={[styles.tagChip, { backgroundColor: C.neonBlue + '18', borderColor: C.neonBlue + '44' }]}
+              onPress={() => removeTag(conv.id, t)}
+            >
+              <Text style={{ fontSize: 11, color: C.neonBlue, fontFamily: 'Sora_600SemiBold' }}>#{t} ×</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <View style={styles.addRow}>
+          <TextInput
+            style={[styles.addInput, { color: C.textPrimary, borderColor: C.border }]}
+            placeholder="Add tag..."
+            placeholderTextColor={C.textMuted}
+            value={newTag}
+            onChangeText={setNewTag}
+            autoCapitalize="none"
+          />
+          <TouchableOpacity
+            onPress={() => { if (newTag.trim()) { addTag(conv.id, newTag.trim().toLowerCase()); setNewTag(''); } }}
+            style={[styles.addBtn, { backgroundColor: C.neonBlue }]}
+          >
+            <Text style={styles.addBtnText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Topics */}
       <View style={styles.topicsRow}>
         {conv.topics.map((t) => (
-          <View key={t} style={styles.topicChip}>
-            <Text style={styles.topicText}>#{t}</Text>
+          <View key={t} style={[styles.topicChip, { backgroundColor: C.neonBlue + '11', borderColor: C.neonBlue + '33' }]}>
+            <Text style={[styles.topicText, { color: C.neonBlue }]}>#{t}</Text>
           </View>
         ))}
       </View>
 
-      {/* Star + Delete + Share actions in summary */}
+      {/* Delete */}
       <View style={styles.summaryActions}>
-        <TouchableOpacity style={[styles.actionBtn, { borderColor: Colors.red + '44' }]} onPress={onDelete}>
-          <Text style={{ color: Colors.red, fontFamily: 'Sora_600SemiBold', fontSize: 13 }}>🗑 Delete</Text>
+        <TouchableOpacity style={[styles.actionBtn, { borderColor: C.red + '44' }]} onPress={onDelete}>
+          <Text style={{ color: C.red, fontFamily: 'Sora_600SemiBold', fontSize: 13 }}>🗑 Delete</Text>
         </TouchableOpacity>
       </View>
     </>
   );
 }
 
-// ── Transcript Tab ────────────────────────────────────────────────────────────
+// ─── Transcript Tab ───────────────────────────────────────────────────────────
 function TranscriptTab({ conv }: { conv: Conversation }) {
+  const C = useColors();
   return (
-    <View style={styles.transcriptCard}>
-      <Text style={styles.transcriptLabel}>FULL TRANSCRIPT</Text>
-      <Text style={styles.transcriptText}>{conv.transcript}</Text>
+    <View style={[styles.transcriptCard, { backgroundColor: C.surface, borderColor: C.border }]}>
+      <Text style={[styles.transcriptLabel, { color: C.textMuted }]}>FULL TRANSCRIPT</Text>
+      <Text style={[styles.transcriptText, { color: C.textSecondary }]}>{conv.transcript}</Text>
     </View>
   );
 }
 
-// ── Reminders Tab ─────────────────────────────────────────────────────────────
-function RemindersTab({ conv, onDelete }: { conv: Conversation; onDelete: () => void }) {
+// ─── Reminders Tab (real reminder system) ────────────────────────────────────
+function RemindersTab({ conv }: { conv: Conversation }) {
+  const C = useColors();
+  const { reminders, loadReminders, addReminder, toggleReminderCompleted, removeReminder } = useStore();
+
+  const [showAdd, setShowAdd]     = useState(false);
+  const [title, setTitle]         = useState('');
+  const [notes, setNotes]         = useState('');
+  const [date, setDate]           = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [repeat, setRepeat]       = useState<Reminder['repeat']>('none');
+
+  useEffect(() => { loadReminders(conv.id); }, [conv.id]);
+
+  const convReminders = reminders.filter((r) => r.conversationId === conv.id);
+
+  const REPEAT_OPTIONS: Reminder['repeat'][] = ['none', 'daily', 'weekly', 'monthly'];
+
+  async function handleAdd() {
+    if (!title.trim()) return;
+    await addReminder(conv.id, title.trim(), notes.trim(), date, repeat);
+    setTitle(''); setNotes(''); setDate(new Date()); setRepeat('none'); setShowAdd(false);
+  }
+
   return (
     <>
-      <Text style={styles.remindersHeader}>THINGS TO REMEMBER</Text>
-      {conv.summary.reminders.length ? conv.summary.reminders.map((r, i) => (
-        <View key={i} style={styles.reminderRow}>
-          <View style={styles.reminderDot} />
-          <Text style={styles.reminderText}>{r}</Text>
+      {/* Existing text reminders from summary */}
+      {conv.summary.reminders.length > 0 && (
+        <View style={[styles.transcriptCard, { backgroundColor: C.surface, borderColor: C.border, marginBottom: Spacing.md }]}>
+          <Text style={[styles.transcriptLabel, { color: C.textMuted }]}>FROM SUMMARY</Text>
+          {conv.summary.reminders.map((r, i) => (
+            <View key={i} style={styles.editRow}>
+              <Text style={{ color: C.textDim, marginRight: 8 }}>→</Text>
+              <Text style={[styles.bulletText, { color: C.textSecondary }]}>{r}</Text>
+            </View>
+          ))}
         </View>
-      )) : (
-        <Text style={styles.mutedText}>No reminders for this conversation.</Text>
       )}
-      <TouchableOpacity style={styles.addReminderBtn}>
-        <Text style={styles.addReminderText}>+ Set Reminder</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onDelete} style={styles.deleteBtn}>
-        <Text style={styles.deleteBtnText}>🗑 Delete Conversation</Text>
-      </TouchableOpacity>
+
+      <Text style={[styles.remindersHeader, { color: C.textMuted }]}>SCHEDULED REMINDERS</Text>
+
+      {/* Reminder list */}
+      {convReminders.map((r) => (
+        <View key={r.id} style={[styles.reminderRow, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <TouchableOpacity onPress={() => toggleReminderCompleted(r.id)} style={{ marginRight: 12 }}>
+            <Text style={{ fontSize: 20 }}>{r.completed ? '☑' : '☐'}</Text>
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.reminderText, { color: r.completed ? C.textMuted : C.textSecondary, textDecorationLine: r.completed ? 'line-through' : 'none' }]}>
+              {r.title}
+            </Text>
+            <Text style={[styles.planSub, { color: C.textMuted }]}>
+              {format(new Date(r.scheduledDate), 'dd MMM • hh:mm a')}
+              {r.repeat !== 'none' ? ` · ${r.repeat}` : ''}
+            </Text>
+            {r.notes ? <Text style={[styles.planSub, { color: C.textDim }]}>{r.notes}</Text> : null}
+          </View>
+          <TouchableOpacity onPress={() => removeReminder(r.id)} hitSlop={8}>
+            <Text style={{ color: C.red, fontSize: 16 }}>×</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+
+      {convReminders.length === 0 && (
+        <Text style={[styles.mutedText, { color: C.textMuted, marginBottom: Spacing.lg }]}>No scheduled reminders yet.</Text>
+      )}
+
+      {/* Add Reminder */}
+      {showAdd ? (
+        <View style={[styles.addReminderForm, { backgroundColor: C.surface, borderColor: C.border }]}>
+          <Text style={[Typography.headingS, { color: C.textPrimary, marginBottom: 12 }]}>New Reminder</Text>
+
+          <TextInput
+            style={[styles.formInput, { color: C.textPrimary, borderColor: C.border }]}
+            placeholder="Reminder title *"
+            placeholderTextColor={C.textMuted}
+            value={title}
+            onChangeText={setTitle}
+          />
+          <TextInput
+            style={[styles.formInput, { color: C.textPrimary, borderColor: C.border }]}
+            placeholder="Notes (optional)"
+            placeholderTextColor={C.textMuted}
+            value={notes}
+            onChangeText={setNotes}
+          />
+
+          {/* Date picker */}
+          <TouchableOpacity
+            style={[styles.formInput, { borderColor: C.border, justifyContent: 'center' }]}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={{ color: C.textSecondary, fontFamily: 'Sora_400Regular', fontSize: 13 }}>
+              📅 {format(date, 'dd MMM yyyy')}
+            </Text>
+          </TouchableOpacity>
+          {showDatePicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display="default"
+              minimumDate={new Date()}
+              onChange={(_, d) => { setShowDatePicker(false); if (d) setDate(d); }}
+            />
+          )}
+
+          {/* Time picker */}
+          <TouchableOpacity
+            style={[styles.formInput, { borderColor: C.border, justifyContent: 'center' }]}
+            onPress={() => setShowTimePicker(true)}
+          >
+            <Text style={{ color: C.textSecondary, fontFamily: 'Sora_400Regular', fontSize: 13 }}>
+              ⏰ {format(date, 'hh:mm a')}
+            </Text>
+          </TouchableOpacity>
+          {showTimePicker && (
+            <DateTimePicker
+              value={date}
+              mode="time"
+              display="default"
+              onChange={(_, d) => { setShowTimePicker(false); if (d) setDate(d); }}
+            />
+          )}
+
+          {/* Repeat */}
+          <Text style={[styles.planSub, { color: C.textMuted, marginBottom: 6 }]}>Repeat</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+            {REPEAT_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt}
+                onPress={() => setRepeat(opt)}
+                style={[
+                  styles.repeatBtn,
+                  { borderColor: repeat === opt ? C.neonBlue : C.border },
+                  repeat === opt && { backgroundColor: C.neonBlue + '18' },
+                ]}
+              >
+                <Text style={{ fontSize: 11, color: repeat === opt ? C.neonBlue : C.textMuted, fontFamily: 'Sora_600SemiBold' }}>
+                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity
+              style={[styles.formBtn, { borderWidth: 1, borderColor: C.border, flex: 1 }]}
+              onPress={() => setShowAdd(false)}
+            >
+              <Text style={{ color: C.textMuted, fontFamily: 'Sora_600SemiBold', fontSize: 13 }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.formBtn, { backgroundColor: C.neonBlue, flex: 1 }]}
+              onPress={handleAdd}
+            >
+              <Text style={{ color: '#000', fontFamily: 'Sora_700Bold', fontSize: 13 }}>Save Reminder</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[styles.addReminderBtn, { borderColor: C.neonBlue, backgroundColor: C.neonBlue + '11' }]}
+          onPress={() => setShowAdd(true)}
+        >
+          <Text style={[styles.addReminderText, { color: C.neonBlue }]}>+ Set Reminder</Text>
+        </TouchableOpacity>
+      )}
     </>
   );
 }
@@ -335,114 +642,69 @@ function formatDur(s: number) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, gap: Spacing.sm,
-  },
+  root: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, paddingVertical: Spacing.md, gap: Spacing.sm },
   backBtn: { paddingRight: 4 },
-  backIcon: { fontSize: 32, color: Colors.neonBlue, lineHeight: 36 },
+  backIcon: { fontSize: 32, lineHeight: 36 },
   headerMeta: { flex: 1 },
-  headerName: { ...Typography.headingM, color: Colors.textPrimary },
-  headerSub: { fontSize: 11, color: Colors.textMuted, fontFamily: 'Sora_400Regular' },
-
-  exportedBanner: {
-    backgroundColor: Colors.neonBlue + '22', borderColor: Colors.neonBlue + '44',
-    borderWidth: 1, borderRadius: Radius.sm,
-    marginHorizontal: Spacing.xl, marginBottom: Spacing.sm,
-    paddingVertical: 8, alignItems: 'center',
-  },
-  exportedText: { fontSize: 12, color: Colors.neonBlue, fontFamily: 'Sora_600SemiBold' },
-
-  player: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border,
-    marginHorizontal: Spacing.xl, marginBottom: Spacing.md,
-    padding: 14, gap: 12,
-  },
-  playBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.neonBlue, alignItems: 'center', justifyContent: 'center' },
+  headerName: { ...Typography.headingM },
+  headerSub: { fontSize: 11, fontFamily: 'Sora_400Regular' },
+  exportedBanner: { borderWidth: 1, borderRadius: Radius.sm, marginHorizontal: Spacing.xl, marginBottom: Spacing.sm, paddingVertical: 8, alignItems: 'center' },
+  exportedText: { fontSize: 12, fontFamily: 'Sora_600SemiBold' },
+  player: { flexDirection: 'row', alignItems: 'center', borderRadius: Radius.lg, borderWidth: 1, marginHorizontal: Spacing.xl, marginBottom: Spacing.md, padding: 14, gap: 12 },
+  playBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   playIcon: { fontSize: 18, color: '#000' },
   playerTrack: { flex: 1 },
-  trackBg: { height: 4, backgroundColor: Colors.border, borderRadius: 2, overflow: 'hidden', marginBottom: 4 },
-  trackFill: { height: '100%', backgroundColor: Colors.neonBlue, borderRadius: 2 },
+  trackBg: { height: 4, borderRadius: 2, overflow: 'hidden', marginBottom: 4 },
+  trackFill: { height: '100%', borderRadius: 2 },
   trackTimes: { flexDirection: 'row', justifyContent: 'space-between' },
-  trackTime: { fontSize: 10, color: Colors.textMuted, fontFamily: 'Sora_400Regular' },
-
-  tabBar: {
-    flexDirection: 'row', backgroundColor: Colors.surfaceVariant,
-    borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
-    marginHorizontal: Spacing.xl, marginBottom: Spacing.md, padding: 3,
-  },
+  trackTime: { fontSize: 10, fontFamily: 'Sora_400Regular' },
+  tabBar: { flexDirection: 'row', borderRadius: Radius.md, borderWidth: 1, marginHorizontal: Spacing.xl, marginBottom: Spacing.md, padding: 3 },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 9 },
-  tabLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 12, color: Colors.textMuted },
-  tabLabelActive: { color: Colors.neonBlue },
-  tabUnderline: { position: 'absolute', bottom: -3, height: 2, width: '60%', backgroundColor: Colors.neonBlue, borderRadius: 1 },
-
+  tabLabel: { fontFamily: 'Sora_600SemiBold', fontSize: 12 },
+  tabUnderline: { position: 'absolute', bottom: -3, height: 2, width: '60%', borderRadius: 1 },
   tabContent: { padding: Spacing.xl, paddingBottom: 100 },
-
-  // Summary tag row
   summaryTagRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
-  summaryDate: { fontSize: 11, color: Colors.textMuted, fontFamily: 'Sora_400Regular' },
-
-  bulletRow: { flexDirection: 'row', gap: 8, marginBottom: 6 },
-  bullet: { fontSize: 14, lineHeight: 22 },
-  bulletText: { flex: 1, fontSize: 13, color: Colors.textSecondary, lineHeight: 21, fontFamily: 'Sora_400Regular' },
-  mutedText: { fontSize: 13, color: Colors.textMuted, fontFamily: 'Sora_400Regular' },
-
-  toneCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border,
-    padding: Spacing.lg, marginBottom: Spacing.md,
-  },
-  toneLabel: { ...Typography.label, color: Colors.textMuted, marginBottom: 8 },
+  summaryDate: { fontSize: 11, fontFamily: 'Sora_400Regular' },
+  editRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 8 },
+  editInput: { flex: 1, borderWidth: 1, borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 6, fontFamily: 'Sora_400Regular', fontSize: 13 },
+  addRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  addInput: { flex: 1, borderWidth: 1, borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 8, fontFamily: 'Sora_400Regular', fontSize: 13 },
+  addBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.sm, alignItems: 'center', justifyContent: 'center' },
+  addBtnText: { color: '#000', fontFamily: 'Sora_700Bold', fontSize: 16 },
+  bulletText: { flex: 1, fontSize: 13, lineHeight: 21, fontFamily: 'Sora_400Regular' },
+  planSub: { fontSize: 11, fontFamily: 'Sora_400Regular', marginTop: 2 },
+  mutedText: { fontSize: 13, fontFamily: 'Sora_400Regular' },
+  toneCard: { borderRadius: Radius.lg, borderWidth: 1, padding: Spacing.lg, marginBottom: Spacing.md },
+  toneLabel: { ...Typography.label, marginBottom: 8 },
   toneEmoji: { fontSize: 28, marginBottom: 4 },
-  toneName: { ...Typography.headingM, color: Colors.textPrimary },
-
+  toneName: { ...Typography.headingM },
+  toneDesc: { fontSize: 12, fontFamily: 'Sora_400Regular', marginTop: 4 },
+  tagsCard: { borderRadius: Radius.lg, borderWidth: 1, padding: Spacing.lg, marginBottom: Spacing.md },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  tagChip: { borderRadius: Radius.full, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
   topicsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: Spacing.md },
-  topicChip: {
-    backgroundColor: Colors.neonBlue + '11', borderWidth: 1,
-    borderColor: Colors.neonBlue + '33', borderRadius: Radius.full,
-    paddingHorizontal: 10, paddingVertical: 3,
-  },
-  topicText: { fontSize: 11, color: Colors.neonBlue, fontFamily: 'Sora_400Regular' },
-
+  topicChip: { borderWidth: 1, borderRadius: Radius.full, paddingHorizontal: 10, paddingVertical: 3 },
+  topicText: { fontSize: 11, fontFamily: 'Sora_400Regular' },
   summaryActions: { flexDirection: 'row', gap: 10, marginTop: Spacing.md },
-  actionBtn: {
-    flex: 1, borderWidth: 1, borderRadius: Radius.md,
-    paddingVertical: 12, alignItems: 'center',
-  },
-
-  transcriptCard: {
-    backgroundColor: Colors.surface, borderRadius: Radius.lg,
-    borderWidth: 1, borderColor: Colors.border, padding: Spacing.lg,
-  },
-  transcriptLabel: { ...Typography.label, color: Colors.textMuted, marginBottom: 12 },
-  transcriptText: { fontSize: 13.5, color: Colors.textSecondary, lineHeight: 24, fontFamily: 'Sora_400Regular' },
-
-  remindersHeader: { ...Typography.label, color: Colors.textMuted, marginBottom: 12 },
-  reminderRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    backgroundColor: Colors.surface, borderRadius: Radius.md,
-    borderWidth: 1, borderColor: Colors.border,
-    padding: Spacing.lg, marginBottom: Spacing.sm,
-  },
-  reminderDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Colors.neonBlue, marginTop: 1, flexShrink: 0 },
-  reminderText: { flex: 1, fontSize: 13.5, color: Colors.textSecondary, fontFamily: 'Sora_400Regular', lineHeight: 21 },
-  addReminderBtn: {
-    borderWidth: 1, borderColor: Colors.neonBlue, borderRadius: Radius.md,
-    paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 12,
-    backgroundColor: Colors.neonBlue + '11',
-  },
-  addReminderText: { fontFamily: 'Sora_700Bold', color: Colors.neonBlue },
-  deleteBtn: {
-    backgroundColor: Colors.red + '18', borderWidth: 1,
-    borderColor: Colors.red + '44', borderRadius: Radius.md,
-    paddingVertical: 14, alignItems: 'center',
-  },
-  deleteBtnText: { fontFamily: 'Sora_700Bold', color: Colors.red },
-
+  actionBtn: { flex: 1, borderWidth: 1, borderRadius: Radius.md, paddingVertical: 12, alignItems: 'center' },
+  transcriptCard: { borderRadius: Radius.lg, borderWidth: 1, padding: Spacing.lg },
+  transcriptLabel: { ...Typography.label, marginBottom: 12 },
+  transcriptText: { fontSize: 13.5, lineHeight: 24, fontFamily: 'Sora_400Regular' },
+  remindersHeader: { ...Typography.label, marginBottom: 12 },
+  reminderRow: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: Radius.md, borderWidth: 1, padding: Spacing.lg, marginBottom: Spacing.sm },
+  reminderText: { fontSize: 13.5, fontFamily: 'Sora_400Regular', lineHeight: 21 },
+  addReminderBtn: { borderWidth: 1, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginTop: 8, marginBottom: 12 },
+  addReminderText: { fontFamily: 'Sora_700Bold' },
+  addReminderForm: { borderRadius: Radius.lg, borderWidth: 1, padding: Spacing.lg, marginBottom: Spacing.md },
+  formInput: { borderWidth: 1, borderRadius: Radius.sm, paddingHorizontal: 12, paddingVertical: 10, fontFamily: 'Sora_400Regular', fontSize: 13, marginBottom: 10 },
+  formBtn: { paddingVertical: 12, borderRadius: Radius.md, alignItems: 'center' },
+  repeatBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1 },
+  moodBackdrop: { flex: 1, backgroundColor: '#000000AA', alignItems: 'center', justifyContent: 'center' },
+  moodCard: { width: 320, borderRadius: Radius.xxl, borderWidth: 1, padding: Spacing.xxl, alignItems: 'center' },
+  moodGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
+  moodOption: { width: 72, alignItems: 'center', padding: 10, borderRadius: Radius.lg, borderWidth: 1, gap: 4 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { ...Typography.bodyM, color: Colors.textMuted },
+  emptyText: { ...Typography.bodyM },
 });
