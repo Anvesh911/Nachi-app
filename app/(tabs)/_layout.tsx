@@ -41,6 +41,10 @@ export default function TabsLayout() {
           name="starred"
           options={{ title: 'Starred', tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⭐</Text> }}
         />
+        <Tabs.Screen
+          name="settings"
+          options={{ title: 'Settings', tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚙️</Text> }}
+        />
       </Tabs>
 
       <Modal
@@ -79,14 +83,12 @@ function MoonFAB({ onPress }: { onPress: () => void }) {
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.fab} activeOpacity={0.85}>
-      {/* Animated glow ring */}
       <Animated.View
         style={[
           styles.fabGlow,
           { opacity: glowOpacity, transform: [{ scale: glowScale }] },
         ]}
       />
-      {/* Moon button */}
       <View style={styles.fabInner}>
         <Text style={{ fontSize: 26 }}>🌙</Text>
       </View>
@@ -123,6 +125,17 @@ function CustomTabBar({
         <Text style={{ fontSize: 22, opacity: state.index === 1 ? 1 : 0.35 }}>⭐</Text>
         <Text style={[styles.tabLabel, state.index === 1 && styles.tabLabelActive]}>
           Starred
+        </Text>
+      </TouchableOpacity>
+
+      {/* Settings tab */}
+      <TouchableOpacity
+        style={styles.tabItem}
+        onPress={() => navigation.navigate(state.routes[2].name)}
+      >
+        <Text style={{ fontSize: 22, opacity: state.index === 2 ? 1 : 0.35 }}>⚙️</Text>
+        <Text style={[styles.tabLabel, state.index === 2 && styles.tabLabelActive]}>
+          Settings
         </Text>
       </TouchableOpacity>
     </View>
