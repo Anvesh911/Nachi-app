@@ -1,8 +1,6 @@
 // app/(tabs)/index.tsx
-// Home screen - converted from Flutter HomeScreen StatefulWidget
-// Uses FlashList instead of Flutter ListView.builder for performance
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -18,7 +16,10 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, Radius } from '../../src/theme';
 import { useStore } from '../../src/store/useStore';
-import { ConvCard, Avatar, LiveDot, SectionLabel } from '../../src/components';
+import {
+  ConvCard, Avatar, LiveDot, SectionLabel,
+  DateFilterBar, DateFilter, applyDateFilter,
+} from '../../src/components';
 import { Conversation } from '../../src/services/types';
 
 const ALL_TAGS = ['All', 'Work', 'Family', 'Friend', 'Health', 'General'];
@@ -26,25 +27,21 @@ const ALL_TAGS = ['All', 'Work', 'Family', 'Friend', 'Health', 'General'];
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const {
-    loadConversations,
-    isLoading,
-    searchQuery,
-    setSearchQuery,
-    filterTag,
-    setFilterTag,
-    getFiltered,
-    toggleStar,
-    removeConversation,
-    hideConversation,
+    loadConversations, isLoading,
+    searchQuery, setSearchQuery,
+    filterTag, setFilterTag,
+    getFiltered, toggleStar,
+    removeConversation, hideConversation,
     conversations,
   } = useStore();
 
-  useEffect(() => {
-    loadConversations();
-  }, []);
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
 
-  const filtered = getFiltered();
-  const starred = conversations.filter((c) => c.starred);
+  useEffect(() => { loadConversations(); }, []);
+
+  // Apply tag + search filter from store, then apply date filter on top
+  const filtered = applyDateFilter(getFiltered(), dateFilter);
+  const starred  = conversations.filter((c) => c.starred);
 
   const onPressConv = useCallback((id: string) => {
     router.push(`/detail/${id}`);
@@ -114,7 +111,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Filter tags */}
+      {/* Tag filter */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -134,7 +131,10 @@ export default function HomeScreen() {
         ))}
       </ScrollView>
 
-      {/* Starred horizontal row */}
+      {/* Date filter */}
+      <DateFilterBar active={dateFilter} onChange={setDateFilter} />
+
+      {/* Starred row */}
       {!searchQuery && starred.length > 0 && (
         <View style={styles.starredSection}>
           <SectionLabel label="⭐ Starred" count={starred.length} />
@@ -152,7 +152,13 @@ export default function HomeScreen() {
               >
                 <Avatar initials={c.avatar} color={c.avatarColor} size={36} />
                 <Text style={styles.starredName} numberOfLines={1}>{c.contact}</Text>
-                <Text style={[styles.starredTag, { color: c.tagColor }]}>{c.tag}</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={[styles.starredTag, { color: c.tagColor }]}>{c.tag}</Text>
+                  {/* Star action directly on starred card */}
+                  <TouchableOpacity onPress={() => toggleStar(c.id)} hitSlop={8}>
+                    <Text style={{ fontSize: 14, opacity: c.starred ? 1 : 0.3 }}>⭐</Text>
+                  </TouchableOpacity>
+                </View>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -165,11 +171,11 @@ export default function HomeScreen() {
           label={searchQuery ? `Results for "${searchQuery}"` : 'Recent Conversations'}
           count={filtered.length}
         />
-        <Text style={styles.hint}>Long-press a conversation to hide or delete</Text>
+        <Text style={styles.hint}>Long-press to hide or delete</Text>
         <FlashList
           data={filtered}
           renderItem={renderItem}
-          estimatedItemSize={110}
+          estimatedItemSize={120}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 100 }}
@@ -186,6 +192,8 @@ export default function HomeScreen() {
               <Text style={styles.emptyText}>
                 {searchQuery
                   ? `No conversations found for "${searchQuery}"`
+                  : dateFilter !== 'all'
+                  ? 'No conversations in this time period.'
                   : 'No conversations yet. Tap 🌙 to record.'}
               </Text>
             </View>
@@ -197,115 +205,40 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
+  root: { flex: 1, backgroundColor: Colors.background },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing.lg,
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'flex-end', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.lg,
   },
-  greeting: {
-    ...Typography.label,
-    color: Colors.textMuted,
-    marginBottom: 2,
-  },
-  appName: {
-    ...Typography.displayM,
-    color: Colors.textPrimary,
-  },
+  greeting: { ...Typography.label, color: Colors.textMuted, marginBottom: 2 },
+  appName: { ...Typography.displayM, color: Colors.textPrimary },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginHorizontal: Spacing.xl,
-    marginBottom: Spacing.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
-    gap: 10,
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: Colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: Colors.border,
+    marginHorizontal: Spacing.xl, marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md, paddingVertical: 10, gap: 10,
   },
   searchIcon: { fontSize: 16 },
-  searchInput: {
-    flex: 1,
-    color: Colors.textSecondary,
-    fontFamily: 'Sora_400Regular',
-    fontSize: 13,
-  },
-  clearBtn: {
-    color: Colors.textMuted,
-    fontSize: 16,
-  },
+  searchInput: { flex: 1, color: Colors.textSecondary, fontFamily: 'Sora_400Regular', fontSize: 13 },
+  clearBtn: { color: Colors.textMuted, fontSize: 16 },
   tagsScroll: { maxHeight: 44 },
-  tagsContent: {
-    paddingHorizontal: Spacing.xl,
-    gap: 8,
-    paddingBottom: 8,
-  },
-  tag: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  tagActive: {
-    borderColor: Colors.neonBlue,
-    backgroundColor: Colors.neonBlue + '18',
-  },
-  tagText: {
-    fontSize: 12,
-    fontFamily: 'Sora_600SemiBold',
-    color: Colors.textMuted,
-  },
+  tagsContent: { paddingHorizontal: Spacing.xl, gap: 8, paddingBottom: 8 },
+  tag: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.border },
+  tagActive: { borderColor: Colors.neonBlue, backgroundColor: Colors.neonBlue + '18' },
+  tagText: { fontSize: 12, fontFamily: 'Sora_600SemiBold', color: Colors.textMuted },
   tagTextActive: { color: Colors.neonBlue },
-  starredSection: {
-    paddingHorizontal: Spacing.xl,
-    marginTop: Spacing.lg,
-    marginBottom: Spacing.md,
-  },
+  starredSection: { paddingHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: Spacing.md },
   starredCard: {
-    width: 140,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: Radius.lg,
-    padding: 14,
-    gap: 8,
+    width: 140, backgroundColor: Colors.surface,
+    borderWidth: 1, borderColor: Colors.border,
+    borderRadius: Radius.lg, padding: 14, gap: 8,
   },
-  starredName: {
-    ...Typography.headingS,
-    color: Colors.textPrimary,
-  },
-  starredTag: {
-    fontSize: 11,
-    fontFamily: 'Sora_400Regular',
-  },
-  listContainer: {
-    flex: 1,
-    paddingHorizontal: Spacing.xl,
-    marginTop: Spacing.lg,
-  },
-  hint: {
-    fontSize: 10,
-    color: Colors.textMuted,
-    fontFamily: 'Sora_400Regular',
-    marginBottom: Spacing.sm,
-    marginTop: -8,
-  },
-  empty: {
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
+  starredName: { ...Typography.headingS, color: Colors.textPrimary },
+  starredTag: { fontSize: 11, fontFamily: 'Sora_400Regular' },
+  listContainer: { flex: 1, paddingHorizontal: Spacing.xl, marginTop: Spacing.lg },
+  hint: { fontSize: 10, color: Colors.textMuted, fontFamily: 'Sora_400Regular', marginBottom: Spacing.sm, marginTop: -8 },
+  empty: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: {
-    ...Typography.bodyM,
-    color: Colors.textMuted,
-    textAlign: 'center',
-  },
+  emptyText: { ...Typography.bodyM, color: Colors.textMuted, textAlign: 'center' },
 });
