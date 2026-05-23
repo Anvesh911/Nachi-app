@@ -76,7 +76,7 @@ export default function LockScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.lockIcon}>🔐</Text>
-        <Text style={styles.appName}>Nachi</Text>
+        <Text style={styles.appName}>AnVy</Text>
         <Text style={[styles.subtitle, error && styles.subtitleError]}>
           {error ? 'Wrong PIN. Try again.' : 'Enter PIN to continue'}
         </Text>
@@ -121,7 +121,7 @@ export default function LockScreen() {
         </TouchableOpacity>
       )}
 
-      <Text style={styles.hint}>Demo PIN: 1234</Text>
+      <Text style={styles.hint}>Enter your PIN to continue</Text>
     </View>
   );
 }
