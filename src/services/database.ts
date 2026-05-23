@@ -1,8 +1,8 @@
 // src/services/database.ts
-// Converted from Flutter DatabaseHelper (sqflite) → expo-sqlite
 
 import * as SQLite from 'expo-sqlite';
-import { Conversation } from './types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Conversation, Reminder, ConversationSummary, Task, DatePlan } from './types';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -39,22 +39,38 @@ async function initSchema(database: SQLite.SQLiteDatabase): Promise<void> {
     CREATE TABLE IF NOT EXISTS reminders (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL,
-      reminder_text TEXT NOT NULL,
-      reminder_time TEXT,
-      is_done INTEGER DEFAULT 0,
+      title TEXT NOT NULL,
+      notes TEXT DEFAULT '',
+      scheduled_date TEXT NOT NULL,
+      repeat TEXT DEFAULT 'none',
+      completed INTEGER DEFAULT 0,
+      notification_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
     );
 
     CREATE INDEX IF NOT EXISTS idx_conversations_date ON conversations(date DESC);
     CREATE INDEX IF NOT EXISTS idx_conversations_starred ON conversations(starred);
     CREATE INDEX IF NOT EXISTS idx_conversations_hidden ON conversations(hidden);
+    CREATE INDEX IF NOT EXISTS idx_reminders_conv ON reminders(conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_reminders_date ON reminders(scheduled_date);
   `);
 
-  // Migration: add hidden column if user already has old DB installed
-  try {
-    await database.execAsync(`ALTER TABLE conversations ADD COLUMN hidden INTEGER DEFAULT 0`);
-  } catch (_) { /* column already exists — safe to ignore */ }
+  // Migrations for existing installs
+  const migrations = [
+    `ALTER TABLE conversations ADD COLUMN hidden INTEGER DEFAULT 0`,
+    `ALTER TABLE reminders ADD COLUMN title TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE reminders ADD COLUMN notes TEXT DEFAULT ''`,
+    `ALTER TABLE reminders ADD COLUMN scheduled_date TEXT NOT NULL DEFAULT ''`,
+    `ALTER TABLE reminders ADD COLUMN repeat TEXT DEFAULT 'none'`,
+    `ALTER TABLE reminders ADD COLUMN notification_id TEXT`,
+  ];
+  for (const m of migrations) {
+    try { await database.execAsync(m); } catch (_) {}
+  }
 }
+
+// ─── Conversations ────────────────────────────────────────────────────────────
 
 export async function insertConversation(conv: Conversation): Promise<void> {
   const database = await getDatabase();
@@ -77,7 +93,6 @@ export async function insertConversation(conv: Conversation): Promise<void> {
   );
 }
 
-// Only returns non-hidden conversations
 export async function getAllConversations(): Promise<Conversation[]> {
   const database = await getDatabase();
   const rows = await database.getAllAsync<any>(
@@ -86,7 +101,6 @@ export async function getAllConversations(): Promise<Conversation[]> {
   return rows.map(rowToConversation);
 }
 
-// Only returns hidden conversations
 export async function getHiddenConversations(): Promise<Conversation[]> {
   const database = await getDatabase();
   const rows = await database.getAllAsync<any>(
@@ -109,17 +123,19 @@ export async function searchConversations(query: string): Promise<Conversation[]
 
 export async function updateStarred(id: string, starred: boolean): Promise<void> {
   const database = await getDatabase();
-  await database.runAsync(
-    `UPDATE conversations SET starred = ? WHERE id = ?`,
-    [starred ? 1 : 0, id]
-  );
+  await database.runAsync(`UPDATE conversations SET starred = ? WHERE id = ?`, [starred ? 1 : 0, id]);
 }
 
 export async function updateHidden(id: string, hidden: boolean): Promise<void> {
   const database = await getDatabase();
+  await database.runAsync(`UPDATE conversations SET hidden = ? WHERE id = ?`, [hidden ? 1 : 0, id]);
+}
+
+export async function updateSummary(id: string, summary: ConversationSummary): Promise<void> {
+  const database = await getDatabase();
   await database.runAsync(
-    `UPDATE conversations SET hidden = ? WHERE id = ?`,
-    [hidden ? 1 : 0, id]
+    `UPDATE conversations SET summary_json = ? WHERE id = ?`,
+    [JSON.stringify(summary), id]
   );
 }
 
@@ -136,9 +152,29 @@ export async function updateTranscriptAndSummary(
 export async function deleteConversation(id: string): Promise<void> {
   const database = await getDatabase();
   await database.runAsync(`DELETE FROM conversations WHERE id = ?`, [id]);
+  // Clean up AsyncStorage reminder data for this conversation
+  try { await AsyncStorage.removeItem(`anvy_reminders_${id}`); } catch (_) {}
 }
 
 function rowToConversation(row: any): Conversation {
+  const rawSummary = (() => {
+    try { return JSON.parse(row.summary_json ?? '{}'); } catch { return {}; }
+  })();
+
+  // Ensure new fields exist for old data
+  const summary: ConversationSummary = {
+    keyPoints:       rawSummary.keyPoints       ?? [],
+    promises:        rawSummary.promises        ?? [],
+    tasks:           rawSummary.tasks           ?? [],
+    dates:           rawSummary.dates           ?? [],
+    datePlans:       rawSummary.datePlans       ?? [],
+    reminders:       rawSummary.reminders       ?? [],
+    tone:            rawSummary.tone            ?? 'Neutral',
+    toneEmoji:       rawSummary.toneEmoji       ?? '😐',
+    toneDescription: rawSummary.toneDescription ?? '',
+    tags:            rawSummary.tags            ?? [],
+  };
+
   return {
     id: row.id,
     contact: row.contact,
@@ -153,7 +189,115 @@ function rowToConversation(row: any): Conversation {
     hidden: row.hidden === 1,
     audioFilePath: row.audio_file_path ?? undefined,
     transcript: row.transcript ?? '',
-    summary: (() => { try { return JSON.parse(row.summary_json ?? '{}'); } catch { return {}; } })(),
+    summary,
     topics: (() => { try { return JSON.parse(row.topics ?? '[]'); } catch { return []; } })(),
   };
+}
+
+// ─── Reminders (SQLite) ───────────────────────────────────────────────────────
+
+export async function insertReminder(reminder: Reminder): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `INSERT OR REPLACE INTO reminders
+      (id, conversation_id, title, notes, scheduled_date, repeat, completed, notification_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      reminder.id,
+      reminder.conversationId,
+      reminder.title,
+      reminder.notes ?? '',
+      reminder.scheduledDate,
+      reminder.repeat,
+      reminder.completed ? 1 : 0,
+      reminder.notificationId ?? null,
+      reminder.createdAt,
+    ]
+  );
+}
+
+export async function getRemindersForConversation(conversationId: string): Promise<Reminder[]> {
+  const database = await getDatabase();
+  const rows = await database.getAllAsync<any>(
+    `SELECT * FROM reminders WHERE conversation_id = ? ORDER BY scheduled_date ASC`,
+    [conversationId]
+  );
+  return rows.map(rowToReminder);
+}
+
+export async function getAllReminders(): Promise<Reminder[]> {
+  const database = await getDatabase();
+  const rows = await database.getAllAsync<any>(
+    `SELECT * FROM reminders ORDER BY scheduled_date ASC`
+  );
+  return rows.map(rowToReminder);
+}
+
+export async function updateReminderCompleted(id: string, completed: boolean): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `UPDATE reminders SET completed = ? WHERE id = ?`,
+    [completed ? 1 : 0, id]
+  );
+}
+
+export async function updateReminder(reminder: Reminder): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(
+    `UPDATE reminders SET title = ?, notes = ?, scheduled_date = ?, repeat = ?, notification_id = ? WHERE id = ?`,
+    [reminder.title, reminder.notes ?? '', reminder.scheduledDate, reminder.repeat, reminder.notificationId ?? null, reminder.id]
+  );
+}
+
+export async function deleteReminder(id: string): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(`DELETE FROM reminders WHERE id = ?`, [id]);
+}
+
+function rowToReminder(row: any): Reminder {
+  return {
+    id: row.id,
+    conversationId: row.conversation_id,
+    title: row.title,
+    notes: row.notes ?? '',
+    scheduledDate: row.scheduled_date,
+    repeat: row.repeat ?? 'none',
+    completed: row.completed === 1,
+    notificationId: row.notification_id ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+// ─── Storage Info ─────────────────────────────────────────────────────────────
+
+export async function getStorageInfo(): Promise<{
+  conversationsCount: number;
+  remindersCount: number;
+  transcriptChars: number;
+}> {
+  const database = await getDatabase();
+  const convCount = await database.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM conversations`);
+  const remCount  = await database.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM reminders`);
+  const transcripts = await database.getAllAsync<{ transcript: string }>(`SELECT transcript FROM conversations`);
+  const totalChars = transcripts.reduce((sum, r) => sum + (r.transcript?.length ?? 0), 0);
+
+  return {
+    conversationsCount: convCount?.count ?? 0,
+    remindersCount: remCount?.count ?? 0,
+    transcriptChars: totalChars,
+  };
+}
+
+export async function clearAllTranscripts(): Promise<void> {
+  const database = await getDatabase();
+  await database.runAsync(`UPDATE conversations SET transcript = ''`);
+}
+
+export async function deleteOldConversations(beforeDate: string): Promise<number> {
+  const database = await getDatabase();
+  const result = await database.runAsync(
+    `DELETE FROM conversations WHERE date < ? AND starred = 0`,
+    [beforeDate]
+  );
+  return result.changes;
 }
