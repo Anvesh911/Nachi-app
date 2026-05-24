@@ -17,7 +17,7 @@ export function Avatar({ initials, color, size = 42 }: {
     <View style={[styles.avatar, {
       width: size, height: size,
       borderRadius: size * 0.33,
-      backgroundColor: color + '28',
+      backgroundColor: color + '22',
       borderColor: color + '44',
     }]}>
       <Text style={[styles.avatarText, { color, fontSize: size * 0.33 }]}>{initials}</Text>
@@ -28,7 +28,7 @@ export function Avatar({ initials, color, size = 42 }: {
 // ─── TagBadge ─────────────────────────────────────────────────────────────────
 export function TagBadge({ label, color }: { label: string; color: string }) {
   return (
-    <View style={[styles.tag, { backgroundColor: color + '18', borderColor: color + '44' }]}>
+    <View style={[styles.tag, { backgroundColor: color + '15', borderColor: color + '40' }]}>
       <Text style={[styles.tagText, { color }]}>{label}</Text>
     </View>
   );
@@ -54,14 +54,18 @@ export function GlassCard({ title, accentColor, children, style }: {
 }) {
   const C = useColors();
   return (
-    <View style={[styles.glassCard, { backgroundColor: C.surface, borderColor: accentColor + '33' }, style]}>
+    <View style={[styles.glassCard, {
+      backgroundColor: C.surface,
+      borderColor: accentColor + '33',
+      shadowColor: accentColor,
+    }, style]}>
       <Text style={[styles.glassCardTitle, { color: accentColor }]}>{title}</Text>
       {children}
     </View>
   );
 }
 
-// ─── DateFilterBar ────────────────────────────────────────────────────────────
+// ─── DateFilterBar — FIX: horizontal compact chips ───────────────────────────
 export type DateFilter = 'all' | 'today' | 'week' | 'month';
 
 export function DateFilterBar({ active, onChange }: {
@@ -69,11 +73,12 @@ export function DateFilterBar({ active, onChange }: {
   onChange: (f: DateFilter) => void;
 }) {
   const C = useColors();
-  const options: { key: DateFilter; label: string }[] = [
-    { key: 'all',   label: 'All Time' },
-    { key: 'today', label: 'Today' },
-    { key: 'week',  label: 'This Week' },
-    { key: 'month', label: 'This Month' },
+
+  const options: { key: DateFilter; label: string; icon: string }[] = [
+    { key: 'all',   label: 'All Time',   icon: '🕐' },
+    { key: 'today', label: 'Today',      icon: '📅' },
+    { key: 'week',  label: 'This Week',  icon: '📆' },
+    { key: 'month', label: 'This Month', icon: '🗓' },
   ];
 
   return (
@@ -82,25 +87,29 @@ export function DateFilterBar({ active, onChange }: {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.dateFilterContent}
     >
-      {options.map((o) => (
-        <TouchableOpacity
-          key={o.key}
-          onPress={() => onChange(o.key)}
-          style={[
-            styles.dateFilterBtn,
-            { borderColor: C.border },
-            active === o.key && { borderColor: C.purple, backgroundColor: C.purple + '18' },
-          ]}
-          activeOpacity={0.7}
-        >
-          <Text style={[
-            styles.dateFilterText,
-            { color: active === o.key ? C.purple : C.textMuted },
-          ]}>
-            {o.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
+      {options.map((o) => {
+        const isActive = active === o.key;
+        return (
+          <TouchableOpacity
+            key={o.key}
+            onPress={() => onChange(o.key)}
+            activeOpacity={0.7}
+            style={[
+              styles.dateFilterBtn,
+              { borderColor: C.border, backgroundColor: C.surface },
+              isActive && { borderColor: C.purple, backgroundColor: C.purplePale },
+            ]}
+          >
+            <Text style={styles.dateFilterIcon}>{o.icon}</Text>
+            <Text style={[
+              styles.dateFilterText,
+              { color: isActive ? C.purple : C.textMuted },
+            ]}>
+              {o.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
     </ScrollView>
   );
 }
@@ -134,7 +143,7 @@ function highlightMatch(text: string, query: string, C: any): React.ReactNode {
   return (
     <Text style={[styles.convSnippet, { color: C.textDim }]}>
       {before}
-      <Text style={{ backgroundColor: C.neonBlue + '33', color: C.neonBlue }}>{match}</Text>
+      <Text style={{ backgroundColor: C.purple + '33', color: C.purple }}>{match}</Text>
       {after}
     </Text>
   );
@@ -160,7 +169,11 @@ export function ConvCard({
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={500}
-      style={[styles.convCard, { backgroundColor: C.surface, borderColor: C.border }]}
+      style={[styles.convCard, {
+        backgroundColor: C.surface,
+        borderColor: C.border,
+        shadowColor: C.purple,
+      }]}
     >
       <View style={styles.convCardInner}>
         <Avatar initials={c.avatar} color={c.avatarColor} />
@@ -214,16 +227,26 @@ export function SavedModal({ visible, onViewSummary, onViewTranscript, onDismiss
 
   return (
     <View style={savedStyles.overlay}>
-      <View style={[savedStyles.card, { backgroundColor: C.surface, borderColor: C.border }]}>
+      <View style={[savedStyles.card, {
+        backgroundColor: C.surface,
+        borderColor: C.border,
+        shadowColor: C.purple,
+      }]}>
         <Text style={savedStyles.icon}>✅</Text>
         <Text style={[savedStyles.title, { color: C.textPrimary }]}>Saved Successfully</Text>
         <Text style={[savedStyles.subtitle, { color: C.textMuted }]}>
           Recording with {contactName} has been saved.
         </Text>
-        <TouchableOpacity style={[savedStyles.primaryBtn, { backgroundColor: C.neonBlue }]} onPress={onViewSummary}>
+        <TouchableOpacity
+          style={[savedStyles.primaryBtn, { backgroundColor: C.purple }]}
+          onPress={onViewSummary}
+        >
           <Text style={savedStyles.primaryBtnText}>📋  View Summary</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[savedStyles.secondaryBtn, { borderColor: C.border }]} onPress={onViewTranscript}>
+        <TouchableOpacity
+          style={[savedStyles.secondaryBtn, { borderColor: C.border }]}
+          onPress={onViewTranscript}
+        >
           <Text style={[savedStyles.secondaryBtnText, { color: C.textSecondary }]}>📝  View Transcript</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onDismiss} style={{ marginTop: 12, paddingVertical: 8 }}>
@@ -238,17 +261,48 @@ export function SavedModal({ visible, onViewSummary, onViewTranscript, onDismiss
 const styles = StyleSheet.create({
   avatar: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   avatarText: { fontFamily: 'Sora_700Bold' },
-  tag: { borderRadius: Radius.full, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 2 },
+
+  tag: { borderRadius: Radius.full, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   tagText: { fontSize: 11, fontFamily: 'Sora_600SemiBold' },
+
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   sectionLabel: { ...Typography.label },
   sectionCount: { fontSize: 11, fontFamily: 'Sora_400Regular' },
-  glassCard: { borderRadius: Radius.lg, borderWidth: 1, padding: Spacing.lg, marginBottom: Spacing.md },
+
+  glassCard: {
+    borderRadius: Radius.lg, borderWidth: 1,
+    padding: Spacing.lg, marginBottom: Spacing.md,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+  },
   glassCardTitle: { ...Typography.label, marginBottom: Spacing.sm },
-  dateFilterContent: { paddingHorizontal: Spacing.xl, gap: 8, paddingBottom: 8 },
-  dateFilterBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1 },
+
+  // FIX: compact horizontal chips
+  dateFilterContent: {
+    paddingHorizontal: Spacing.xl,
+    gap: 8,
+    paddingBottom: 8,
+    alignItems: 'center',
+  },
+  dateFilterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: Radius.full,
+    borderWidth: 1.5,
+    height: 32,
+  },
+  dateFilterIcon: { fontSize: 12 },
   dateFilterText: { fontSize: 12, fontFamily: 'Sora_600SemiBold' },
-  convCard: { borderRadius: Radius.lg, borderWidth: 1, marginBottom: Spacing.sm, padding: Spacing.lg },
+
+  convCard: {
+    borderRadius: Radius.lg, borderWidth: 1,
+    marginBottom: Spacing.sm, padding: Spacing.lg,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+  },
   convCardInner: { flexDirection: 'row', gap: Spacing.md },
   convContent: { flex: 1 },
   convTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
@@ -260,19 +314,33 @@ const styles = StyleSheet.create({
   convDate: { fontSize: 11, fontFamily: 'Sora_400Regular' },
   convDuration: { fontSize: 11, fontFamily: 'Sora_400Regular' },
   starBtn: { padding: 4 },
+
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  liveDot: { width: 8, height: 8, borderRadius: 4, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 4, elevation: 4 },
+  liveDot: {
+    width: 8, height: 8, borderRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1, shadowRadius: 4, elevation: 4,
+  },
   liveText: { fontSize: 10, fontFamily: 'Sora_600SemiBold', letterSpacing: 1.5 },
 });
 
 const savedStyles = StyleSheet.create({
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000000CC', alignItems: 'center', justifyContent: 'center', zIndex: 999 },
-  card: { width: 320, borderRadius: Radius.xxl, borderWidth: 1, padding: 28, alignItems: 'center' },
+  overlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: '#00000088',
+    alignItems: 'center', justifyContent: 'center', zIndex: 999,
+  },
+  card: {
+    width: 320, borderRadius: Radius.xxl, borderWidth: 1,
+    padding: 28, alignItems: 'center',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15, shadowRadius: 24, elevation: 12,
+  },
   icon: { fontSize: 48, marginBottom: 12 },
   title: { fontFamily: 'Sora_700Bold', fontSize: 20, marginBottom: 8 },
   subtitle: { fontFamily: 'Sora_400Regular', fontSize: 13, textAlign: 'center', marginBottom: 24 },
   primaryBtn: { width: '100%', borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
-  primaryBtnText: { fontFamily: 'Sora_700Bold', fontSize: 14, color: '#000' },
+  primaryBtnText: { fontFamily: 'Sora_700Bold', fontSize: 14, color: '#FFFFFF' },
   secondaryBtn: { width: '100%', borderWidth: 1, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
   secondaryBtnText: { fontFamily: 'Sora_600SemiBold', fontSize: 14 },
   dismissText: { fontFamily: 'Sora_400Regular', fontSize: 13 },
