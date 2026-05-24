@@ -14,7 +14,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors, Typography, Spacing, Radius } from '../../src/theme';
+import { useColors, Typography, Spacing, Radius, Shadow } from '../../src/theme';
 import { useStore } from '../../src/store/useStore';
 import {
   ConvCard, Avatar, LiveDot, SectionLabel,
@@ -83,14 +83,19 @@ export default function HomeScreen() {
         <View>
           <Text style={[styles.greeting, { color: C.textMuted }]}>GOOD DAY</Text>
           <Text style={[styles.appName, { color: C.textPrimary }]}>
-            AnVy <Text style={{ color: C.neonBlue }}>·</Text>
+            Nachi <Text style={{ color: C.purple }}>·</Text>
           </Text>
         </View>
         <LiveDot />
       </View>
 
       {/* Search bar */}
-      <View style={[styles.searchContainer, { backgroundColor: C.surface, borderColor: C.border }]}>
+      <View style={[styles.searchContainer, {
+        backgroundColor: C.surface,
+        borderColor: C.border,
+        ...Shadow.card,
+        shadowColor: C.purple,
+      }]}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={[styles.searchInput, { color: C.textSecondary }]}
@@ -121,13 +126,16 @@ export default function HomeScreen() {
             onPress={() => setFilterTag(tag)}
             style={[
               styles.tag,
-              { borderColor: C.border },
-              filterTag === tag && { borderColor: C.neonBlue, backgroundColor: C.neonBlue + '18' },
+              { borderColor: C.border, backgroundColor: C.surface },
+              filterTag === tag && {
+                borderColor: C.purple,
+                backgroundColor: C.purplePale,
+              },
             ]}
           >
             <Text style={[
               styles.tagText,
-              { color: filterTag === tag ? C.neonBlue : C.textMuted },
+              { color: filterTag === tag ? C.purple : C.textMuted },
             ]}>
               {tag}
             </Text>
@@ -135,7 +143,7 @@ export default function HomeScreen() {
         ))}
       </ScrollView>
 
-      {/* Date filter */}
+      {/* Date filter — FIX: compact horizontal chips */}
       <DateFilterBar active={dateFilter} onChange={setDateFilter} />
 
       {/* Starred row */}
@@ -150,7 +158,12 @@ export default function HomeScreen() {
             {starred.map((c) => (
               <TouchableOpacity
                 key={c.id}
-                style={[styles.starredCard, { backgroundColor: C.surface, borderColor: C.border }]}
+                style={[styles.starredCard, {
+                  backgroundColor: C.surface,
+                  borderColor: C.border,
+                  ...Shadow.card,
+                  shadowColor: C.purple,
+                }]}
                 onPress={() => onPressConv(c.id)}
                 activeOpacity={0.75}
               >
@@ -188,18 +201,18 @@ export default function HomeScreen() {
             <RefreshControl
               refreshing={isLoading}
               onRefresh={loadConversations}
-              tintColor={C.neonBlue}
+              tintColor={C.purple}
             />
           }
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>🌙</Text>
+              <Text style={styles.emptyIcon}>🎙️</Text>
               <Text style={[styles.emptyText, { color: C.textMuted }]}>
                 {searchQuery
                   ? `No conversations found for "${searchQuery}"`
                   : dateFilter !== 'all'
                   ? 'No conversations in this time period.'
-                  : 'No conversations yet. Tap 🌙 to record.'}
+                  : 'No conversations yet.\nTap the mic button to record.'}
               </Text>
             </View>
           }
@@ -213,13 +226,14 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'flex-end', paddingHorizontal: Spacing.xl, paddingVertical: Spacing.lg,
+    alignItems: 'flex-end', paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.md, paddingBottom: Spacing.lg,
   },
   greeting: { ...Typography.label, marginBottom: 2 },
   appName: { ...Typography.displayM },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center',
-    borderRadius: Radius.lg, borderWidth: 1,
+    borderRadius: Radius.lg, borderWidth: 1.5,
     marginHorizontal: Spacing.xl, marginBottom: Spacing.md,
     paddingHorizontal: Spacing.md, paddingVertical: 10, gap: 10,
   },
@@ -228,15 +242,25 @@ const styles = StyleSheet.create({
   clearBtn: { fontSize: 16 },
   tagsScroll: { maxHeight: 44 },
   tagsContent: { paddingHorizontal: Spacing.xl, gap: 8, paddingBottom: 8 },
-  tag: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1 },
+  tag: {
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderRadius: Radius.full, borderWidth: 1.5,
+  },
   tagText: { fontSize: 12, fontFamily: 'Sora_600SemiBold' },
-  starredSection: { paddingHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: Spacing.md },
-  starredCard: { width: 140, borderWidth: 1, borderRadius: Radius.lg, padding: 14, gap: 8 },
+  starredSection: {
+    paddingHorizontal: Spacing.xl,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  starredCard: {
+    width: 140, borderWidth: 1.5,
+    borderRadius: Radius.lg, padding: 14, gap: 8,
+  },
   starredName: { ...Typography.headingS },
-  starredTag: { fontSize: 11, fontFamily: 'Sora_400Regular' },
+  starredTag: { fontSize: 11, fontFamily: 'Sora_600SemiBold' },
   listContainer: { flex: 1, paddingHorizontal: Spacing.xl, marginTop: Spacing.lg },
   hint: { fontSize: 10, fontFamily: 'Sora_400Regular', marginBottom: Spacing.sm, marginTop: -8 },
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { ...Typography.bodyM, textAlign: 'center' },
+  emptyText: { ...Typography.bodyM, textAlign: 'center', lineHeight: 22 },
 });
