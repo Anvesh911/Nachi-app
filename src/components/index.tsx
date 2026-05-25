@@ -5,9 +5,58 @@ import {
   View, Text, TouchableOpacity, StyleSheet,
   ViewStyle, ScrollView,
 } from 'react-native';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useColors, Typography, Spacing, Radius } from '../theme';
 import { Conversation } from '../services/types';
 import { formatDistanceToNow, format } from 'date-fns';
+
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
+
+function ClockIcon({ color }: { color: string }) {
+  return (
+    <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={9} stroke={color} strokeWidth={2}/>
+      <Path d="M12 6v6l4 2" stroke={color} strokeWidth={2} strokeLinecap="round"/>
+    </Svg>
+  );
+}
+
+function CalIcon({ color }: { color: string }) {
+  return (
+    <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+      <Rect x={3} y={4} width={18} height={17} rx={3} stroke={color} strokeWidth={2}/>
+      <Path d="M8 2v3M16 2v3M3 9h18" stroke={color} strokeWidth={2} strokeLinecap="round"/>
+    </Svg>
+  );
+}
+
+function CalWeekIcon({ color }: { color: string }) {
+  return (
+    <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+      <Rect x={3} y={4} width={18} height={17} rx={3} stroke={color} strokeWidth={2}/>
+      <Path d="M8 2v3M16 2v3M3 9h18M8 14h.01M12 14h.01M16 14h.01" stroke={color} strokeWidth={2} strokeLinecap="round"/>
+    </Svg>
+  );
+}
+
+function CalMonthIcon({ color }: { color: string }) {
+  return (
+    <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
+      <Rect x={3} y={4} width={18} height={17} rx={3} stroke={color} strokeWidth={2}/>
+      <Path d="M8 2v3M16 2v3M3 9h18" stroke={color} strokeWidth={2} strokeLinecap="round"/>
+      <Circle cx={12} cy={15} r={3} stroke={color} strokeWidth={2}/>
+    </Svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Circle cx={11} cy={11} r={7} stroke="#9B8EC4" strokeWidth={2}/>
+      <Path d="m16.5 16.5 3.5 3.5" stroke="#9B8EC4" strokeWidth={2} strokeLinecap="round"/>
+    </Svg>
+  );
+}
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 export function Avatar({ initials, color, size = 42 }: {
@@ -16,11 +65,11 @@ export function Avatar({ initials, color, size = 42 }: {
   return (
     <View style={[styles.avatar, {
       width: size, height: size,
-      borderRadius: size * 0.33,
+      borderRadius: size * 0.286, // matches HTML: border-radius: 12px on 42px = 0.286
       backgroundColor: color + '22',
       borderColor: color + '44',
     }]}>
-      <Text style={[styles.avatarText, { color, fontSize: size * 0.33 }]}>{initials}</Text>
+      <Text style={[styles.avatarText, { color, fontSize: size * 0.31 }]}>{initials}</Text>
     </View>
   );
 }
@@ -65,7 +114,7 @@ export function GlassCard({ title, accentColor, children, style }: {
   );
 }
 
-// ─── DateFilterBar — FIX: horizontal compact chips ───────────────────────────
+// ─── DateFilterBar — horizontal compact chips with SVG icons ─────────────────
 export type DateFilter = 'all' | 'today' | 'week' | 'month';
 
 export function DateFilterBar({ active, onChange }: {
@@ -74,11 +123,11 @@ export function DateFilterBar({ active, onChange }: {
 }) {
   const C = useColors();
 
-  const options: { key: DateFilter; label: string; icon: string }[] = [
-    { key: 'all',   label: 'All Time',   icon: '🕐' },
-    { key: 'today', label: 'Today',      icon: '📅' },
-    { key: 'week',  label: 'This Week',  icon: '📆' },
-    { key: 'month', label: 'This Month', icon: '🗓' },
+  const options: { key: DateFilter; label: string; Icon: any }[] = [
+    { key: 'all',   label: 'All Time',   Icon: ClockIcon    },
+    { key: 'today', label: 'Today',      Icon: CalIcon      },
+    { key: 'week',  label: 'This Week',  Icon: CalWeekIcon  },
+    { key: 'month', label: 'This Month', Icon: CalMonthIcon },
   ];
 
   return (
@@ -89,6 +138,7 @@ export function DateFilterBar({ active, onChange }: {
     >
       {options.map((o) => {
         const isActive = active === o.key;
+        const iconColor = isActive ? C.purple : C.textMuted;
         return (
           <TouchableOpacity
             key={o.key}
@@ -100,11 +150,8 @@ export function DateFilterBar({ active, onChange }: {
               isActive && { borderColor: C.purple, backgroundColor: C.purplePale },
             ]}
           >
-            <Text style={styles.dateFilterIcon}>{o.icon}</Text>
-            <Text style={[
-              styles.dateFilterText,
-              { color: isActive ? C.purple : C.textMuted },
-            ]}>
+            <o.Icon color={iconColor} />
+            <Text style={[styles.dateFilterText, { color: iconColor }]}>
               {o.label}
             </Text>
           </TouchableOpacity>
@@ -129,10 +176,10 @@ export function applyDateFilter(conversations: Conversation[], filter: DateFilte
 // ─── highlight helper ─────────────────────────────────────────────────────────
 function highlightMatch(text: string, query: string, C: any): React.ReactNode {
   const snippet = text.slice(0, 80);
-  if (!query) return <Text style={[styles.convSnippet, { color: C.textDim }]}>{snippet}...</Text>;
+  if (!query) return <Text style={[styles.convSnippet, { color: C.textMuted }]}>{snippet}...</Text>;
   const lower = text.toLowerCase();
   const idx   = lower.indexOf(query.toLowerCase());
-  if (idx === -1) return <Text style={[styles.convSnippet, { color: C.textDim }]}>{snippet}...</Text>;
+  if (idx === -1) return <Text style={[styles.convSnippet, { color: C.textMuted }]}>{snippet}...</Text>;
 
   const start  = Math.max(0, idx - 20);
   const end    = Math.min(text.length, idx + query.length + 40);
@@ -141,7 +188,7 @@ function highlightMatch(text: string, query: string, C: any): React.ReactNode {
   const after  = text.slice(idx + query.length, end) + (end < text.length ? '...' : '');
 
   return (
-    <Text style={[styles.convSnippet, { color: C.textDim }]}>
+    <Text style={[styles.convSnippet, { color: C.textMuted }]}>
       {before}
       <Text style={{ backgroundColor: C.purple + '33', color: C.purple }}>{match}</Text>
       {after}
@@ -182,19 +229,18 @@ export function ConvCard({
             <Text style={[styles.convContact, { color: C.textPrimary }]} numberOfLines={1}>{c.contact}</Text>
             <Text style={[styles.convTime, { color: C.textMuted }]}>{timeAgo}</Text>
           </View>
-          <View style={{ marginBottom: 6 }}>
+          <View style={{ marginBottom: 8 }}>
             {highlightMatch(c.transcript, searchQuery, C)}
           </View>
-          <View style={styles.convTagRow}>
-            <TagBadge label={c.tag} color={c.tagColor} />
-            <Text style={[styles.convDuration, { color: C.textMuted }]}>⏱ {c.durationLabel}</Text>
-          </View>
           <View style={styles.convBottom}>
-            <Text style={[styles.convDate, { color: C.textMuted }]}>
-              {format(new Date(c.date), 'dd MMM yyyy')}
-            </Text>
+            <View style={styles.convTagRow}>
+              <TagBadge label={c.tag} color={c.tagColor} />
+              <Text style={[styles.convDuration, { color: C.textMuted }]}>
+                ⏱ {c.durationLabel}
+              </Text>
+            </View>
             <TouchableOpacity onPress={onStar} hitSlop={12} style={styles.starBtn}>
-              <Text style={{ fontSize: 16, opacity: c.starred ? 1 : 0.3 }}>⭐</Text>
+              <Text style={{ fontSize: 15, opacity: c.starred ? 1 : 0.3 }}>⭐</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -213,6 +259,9 @@ export function LiveDot() {
     </View>
   );
 }
+
+// ─── SearchBarIcon export ─────────────────────────────────────────────────────
+export { SearchIcon };
 
 // ─── SavedModal ───────────────────────────────────────────────────────────────
 export function SavedModal({ visible, onViewSummary, onViewTranscript, onDismiss, contactName }: {
@@ -262,26 +311,33 @@ const styles = StyleSheet.create({
   avatar: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   avatarText: { fontFamily: 'Sora_700Bold' },
 
-  tag: { borderRadius: Radius.full, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
-  tagText: { fontSize: 11, fontFamily: 'Sora_600SemiBold' },
+  // tag badge — from HTML: padding: 2px 9px, border-radius: 99px, border: 1.5px
+  tag: { borderRadius: Radius.full, borderWidth: 1.5, paddingHorizontal: 9, paddingVertical: 2 },
+  tagText: { fontSize: 10, fontFamily: 'Sora_700Bold' },
 
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
-  sectionLabel: { ...Typography.label },
-  sectionCount: { fontSize: 11, fontFamily: 'Sora_400Regular' },
+  sectionRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 18, marginBottom: 9,
+  },
+  sectionLabel: {
+    fontSize: 11, fontFamily: 'Sora_700Bold',
+    letterSpacing: 1.5, textTransform: 'uppercase',
+  },
+  sectionCount: { fontSize: 11, fontFamily: 'Sora_600SemiBold' },
 
   glassCard: {
-    borderRadius: Radius.lg, borderWidth: 1,
+    borderRadius: Radius.lg, borderWidth: 1.5,
     padding: Spacing.lg, marginBottom: Spacing.md,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
   glassCardTitle: { ...Typography.label, marginBottom: Spacing.sm },
 
-  // FIX: compact horizontal chips
+  // date filter chips — from HTML: height:30px, padding: 6px 12px, gap:5px
   dateFilterContent: {
     paddingHorizontal: Spacing.xl,
-    gap: 8,
-    paddingBottom: 8,
+    gap: 7,
+    paddingBottom: 12,
     alignItems: 'center',
   },
   dateFilterBtn: {
@@ -292,27 +348,31 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: Radius.full,
     borderWidth: 1.5,
-    height: 32,
+    height: 30,
   },
-  dateFilterIcon: { fontSize: 12 },
-  dateFilterText: { fontSize: 12, fontFamily: 'Sora_600SemiBold' },
+  dateFilterText: { fontSize: 11, fontFamily: 'Sora_700Bold' },
 
+  // conv card — from HTML: border-radius:18px, padding:14px, gap:11px, border:1.5px
   convCard: {
-    borderRadius: Radius.lg, borderWidth: 1,
-    marginBottom: Spacing.sm, padding: Spacing.lg,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    marginBottom: 8,
+    padding: 14,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07, shadowRadius: 8, elevation: 3,
+    shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
   },
-  convCardInner: { flexDirection: 'row', gap: Spacing.md },
+  convCardInner: { flexDirection: 'row', gap: 11 },
   convContent: { flex: 1 },
-  convTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  convContact: { ...Typography.headingS, flex: 1 },
-  convTime: { fontSize: 11, fontFamily: 'Sora_400Regular' },
-  convSnippet: { fontSize: 12, lineHeight: 18, fontFamily: 'Sora_400Regular' },
-  convTagRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  convTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 },
+  // cname: font-size:14px, font-weight:800
+  convContact: { fontSize: 14, fontFamily: 'Sora_700Bold', flex: 1 },
+  // ctime: font-size:10px, font-weight:600
+  convTime: { fontSize: 10, fontFamily: 'Sora_600SemiBold' },
+  // csnip: font-size:12px, line-height:1.6
+  convSnippet: { fontSize: 12, lineHeight: 19, fontFamily: 'Sora_400Regular' },
+  convTagRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   convBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  convDate: { fontSize: 11, fontFamily: 'Sora_400Regular' },
-  convDuration: { fontSize: 11, fontFamily: 'Sora_400Regular' },
+  convDuration: { fontSize: 10, fontFamily: 'Sora_600SemiBold' },
   starBtn: { padding: 4 },
 
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -321,7 +381,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1, shadowRadius: 4, elevation: 4,
   },
-  liveText: { fontSize: 10, fontFamily: 'Sora_600SemiBold', letterSpacing: 1.5 },
+  liveText: { fontSize: 10, fontFamily: 'Sora_700Bold', letterSpacing: 1.5 },
 });
 
 const savedStyles = StyleSheet.create({
@@ -331,7 +391,7 @@ const savedStyles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', zIndex: 999,
   },
   card: {
-    width: 320, borderRadius: Radius.xxl, borderWidth: 1,
+    width: 320, borderRadius: Radius.xxl, borderWidth: 1.5,
     padding: 28, alignItems: 'center',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15, shadowRadius: 24, elevation: 12,
@@ -341,7 +401,7 @@ const savedStyles = StyleSheet.create({
   subtitle: { fontFamily: 'Sora_400Regular', fontSize: 13, textAlign: 'center', marginBottom: 24 },
   primaryBtn: { width: '100%', borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
   primaryBtnText: { fontFamily: 'Sora_700Bold', fontSize: 14, color: '#FFFFFF' },
-  secondaryBtn: { width: '100%', borderWidth: 1, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
+  secondaryBtn: { width: '100%', borderWidth: 1.5, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
   secondaryBtnText: { fontFamily: 'Sora_600SemiBold', fontSize: 14 },
   dismissText: { fontFamily: 'Sora_400Regular', fontSize: 13 },
 });
