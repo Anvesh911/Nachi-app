@@ -3,15 +3,136 @@
 import { useState, useRef, useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Animated,
+  View, Text, TouchableOpacity, StyleSheet,
+  Modal, Animated,
 } from 'react-native';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useColors, Radius } from '../../src/theme';
 import RecordingSheet from '../../src/screens/RecordingSheet';
+
+// ─── SVG Icons ────────────────────────────────────────────────────────────────
+
+function HomeIcon({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 12L12 3l9 9" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
+      <Path d="M5 10v9a1 1 0 001 1h4v-5h4v5h4a1 1 0 001-1v-9" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+function StarIcon({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"/>
+    </Svg>
+  );
+}
+
+function PersonIcon({ color }: { color: string }) {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={8} r={4} stroke={color} strokeWidth={2}/>
+      <Path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={color} strokeWidth={2} strokeLinecap="round"/>
+    </Svg>
+  );
+}
+
+function MicIcon() {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 3C10.3 3 9 4.3 9 6v7c0 1.7 1.3 3 3 3s3-1.3 3-3V6c0-1.7-1.3-3-3-3z" stroke="white" strokeWidth={2}/>
+      <Path d="M5 11c0 3.9 3.1 7 7 7s7-3.1 7-7" stroke="white" strokeWidth={2} strokeLinecap="round"/>
+      <Path d="M12 18v3M9 21h6" stroke="white" strokeWidth={2} strokeLinecap="round"/>
+    </Svg>
+  );
+}
+
+// ─── FAB ─────────────────────────────────────────────────────────────────────
+
+function FAB({ onPress }: { onPress: () => void }) {
+  const C     = useColors();
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(0.6)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(scale,   { toValue: 1.12, duration: 1000, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.15, duration: 1000, useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(scale,   { toValue: 1,    duration: 1000, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.6,  duration: 1000, useNativeDriver: true }),
+        ]),
+      ])
+    ).start();
+  }, []);
+
+  return (
+    <TouchableOpacity onPress={onPress} style={styles.fabWrap} activeOpacity={0.85}>
+      {/* Pulse ring */}
+      <Animated.View style={[
+        styles.fabRing,
+        { borderColor: C.purple + '4D', transform: [{ scale }], opacity },
+      ]} />
+      {/* FAB button */}
+      <View style={[styles.fabInner, {
+        shadowColor: C.purple,
+      }]}>
+        <MicIcon />
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Custom Tab Bar ───────────────────────────────────────────────────────────
+
+function CustomTabBar({ state, navigation, onRecord }: any) {
+  const C = useColors();
+
+  const tabs = [
+    { name: state.routes[0].name, label: 'Home',     Icon: HomeIcon },
+    { name: 'fab',                label: '',          Icon: null     },
+    { name: state.routes[1].name, label: 'Starred',  Icon: StarIcon },
+    { name: state.routes[2].name, label: 'Settings', Icon: PersonIcon },
+  ];
+
+  return (
+    <View style={[styles.tabBar, {
+      backgroundColor: 'rgba(255,255,255,0.97)',
+      borderTopColor: C.border,
+    }]}>
+      {tabs.map((tab, i) => {
+        if (tab.name === 'fab') {
+          return <FAB key="fab" onPress={onRecord} />;
+        }
+
+        // Map route index (skipping fab slot)
+        const routeIndex = i > 1 ? i - 1 : i;
+        const isActive   = state.index === routeIndex;
+        const color      = isActive ? C.purple : C.textMuted;
+
+        return (
+          <TouchableOpacity
+            key={tab.name}
+            style={styles.tabItem}
+            onPress={() => navigation.navigate(tab.name)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.tabIcon}>
+              {tab.Icon && <tab.Icon color={color} />}
+            </View>
+            <Text style={[styles.tabLabel, { color }]}>{tab.label}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
 
 export default function TabsLayout() {
   const [showRecord, setShowRecord] = useState(false);
@@ -20,39 +141,14 @@ export default function TabsLayout() {
   return (
     <>
       <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: C.background,
-            borderTopColor: C.border,
-            borderTopWidth: 1,
-            height: 72,
-            paddingBottom: 8,
-          },
-          tabBarActiveTintColor: C.neonBlue,
-          tabBarInactiveTintColor: C.textMuted,
-          tabBarLabelStyle: {
-            fontFamily: 'Sora_600SemiBold',
-            fontSize: 10,
-            letterSpacing: 0.5,
-          },
-        }}
+        screenOptions={{ headerShown: false }}
         tabBar={(props) => (
           <CustomTabBar {...props} onRecord={() => setShowRecord(true)} />
         )}
       >
-        <Tabs.Screen
-          name="index"
-          options={{ title: 'Home', tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>🏠</Text> }}
-        />
-        <Tabs.Screen
-          name="starred"
-          options={{ title: 'Starred', tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⭐</Text> }}
-        />
-        <Tabs.Screen
-          name="settings"
-          options={{ title: 'Settings', tabBarIcon: ({ color }) => <Text style={{ fontSize: 20, color }}>⚙️</Text> }}
-        />
+        <Tabs.Screen name="index"    options={{ title: 'Home' }} />
+        <Tabs.Screen name="starred"  options={{ title: 'Starred' }} />
+        <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
       </Tabs>
 
       <Modal
@@ -74,107 +170,63 @@ export default function TabsLayout() {
   );
 }
 
-// ─── Moon FAB ─────────────────────────────────────────────────────────────────
-function MoonFAB({ onPress }: { onPress: () => void }) {
-  const C    = useColors();
-  const glow = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(glow, { toValue: 1, duration: 1800, useNativeDriver: true }),
-        Animated.timing(glow, { toValue: 0, duration: 1800, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
-
-  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.9] });
-  const glowScale   = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] });
-
-  return (
-    <TouchableOpacity onPress={onPress} style={styles.fab} activeOpacity={0.85}>
-      <Animated.View
-        style={[
-          styles.fabGlow,
-          {
-            backgroundColor: C.neonBlue + '33',
-            borderColor: C.neonBlue + '66',
-            opacity: glowOpacity,
-            transform: [{ scale: glowScale }],
-          },
-        ]}
-      />
-      <View style={[styles.fabInner, { backgroundColor: C.neonBlue, shadowColor: C.neonBlue }]}>
-        <Text style={{ fontSize: 26 }}>🌙</Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Custom Tab Bar ───────────────────────────────────────────────────────────
-function CustomTabBar({ state, navigation, onRecord }: any & { onRecord: () => void }) {
-  const C = useColors();
-
-  return (
-    <View style={[styles.tabBarContainer, { backgroundColor: C.background, borderTopColor: C.border }]}>
-      {/* Home */}
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigation.navigate(state.routes[0].name)}
-      >
-        <Text style={{ fontSize: 22, opacity: state.index === 0 ? 1 : 0.35 }}>🏠</Text>
-        <Text style={[styles.tabLabel, { color: state.index === 0 ? C.neonBlue : C.textMuted }]}>
-          Home
-        </Text>
-      </TouchableOpacity>
-
-      {/* Moon FAB */}
-      <MoonFAB onPress={onRecord} />
-
-      {/* Starred */}
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigation.navigate(state.routes[1].name)}
-      >
-        <Text style={{ fontSize: 22, opacity: state.index === 1 ? 1 : 0.35 }}>⭐</Text>
-        <Text style={[styles.tabLabel, { color: state.index === 1 ? C.neonBlue : C.textMuted }]}>
-          Starred
-        </Text>
-      </TouchableOpacity>
-
-      {/* Settings */}
-      <TouchableOpacity
-        style={styles.tabItem}
-        onPress={() => navigation.navigate(state.routes[2].name)}
-      >
-        <Text style={{ fontSize: 22, opacity: state.index === 2 ? 1 : 0.35 }}>⚙️</Text>
-        <Text style={[styles.tabLabel, { color: state.index === 2 ? C.neonBlue : C.textMuted }]}>
-          Settings
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  tabBarContainer: {
+  tabBar: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    height: 80,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingBottom: 12,
-    paddingHorizontal: 20,
+    borderTopWidth: 1.5,
+    height: 72,
+    alignItems: 'flex-start',
+    paddingTop: 8,
+    shadowColor: '#7C4DFF',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 12,
   },
-  tabItem: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 8 },
-  tabLabel: { fontSize: 10, fontFamily: 'Sora_600SemiBold', letterSpacing: 0.5 },
-  fab: { marginTop: -28, alignItems: 'center', justifyContent: 'center', width: 72, height: 72 },
-  fabGlow: { position: 'absolute', width: 72, height: 72, borderRadius: 36, borderWidth: 1 },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 3,
+  },
+  tabIcon: {
+    width: 26, height: 26,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  tabLabel: {
+    fontSize: 9,
+    fontFamily: 'Sora_700Bold',
+    letterSpacing: 0.5,
+  },
+  // FAB
+  fabWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginTop: -24,
+  },
+  fabRing: {
+    position: 'absolute',
+    top: -6, left: '50%',
+    marginLeft: -35,
+    width: 70, height: 70,
+    borderRadius: 35,
+    borderWidth: 1.5,
+  },
   fabInner: {
-    width: 60, height: 60, borderRadius: 30,
+    width: 58, height: 58,
+    borderRadius: 29,
+    backgroundColor: '#7C4DFF',
     alignItems: 'center', justifyContent: 'center',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6, shadowRadius: 16, elevation: 12,
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 12,
+    // gradient simulation — use LinearGradient if expo-linear-gradient installed:
+    // background: linear-gradient(145deg, #9C6FFF, #7C4DFF)
   },
-  modalBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000088' },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: '#00000088',
+  },
 });
