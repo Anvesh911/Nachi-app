@@ -3,14 +3,12 @@
 import React from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ViewStyle, ScrollView,
+  ViewStyle, ScrollView, Modal,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useColors, Typography, Spacing, Radius } from '../theme';
 import { Conversation } from '../services/types';
 import { formatDistanceToNow, format } from 'date-fns';
-
-// ─── SVG Icons ────────────────────────────────────────────────────────────────
 
 function ClockIcon({ color }: { color: string }) {
   return (
@@ -30,25 +28,6 @@ function CalIcon({ color }: { color: string }) {
   );
 }
 
-function CalWeekIcon({ color }: { color: string }) {
-  return (
-    <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
-      <Rect x={3} y={4} width={18} height={17} rx={3} stroke={color} strokeWidth={2}/>
-      <Path d="M8 2v3M16 2v3M3 9h18M8 14h.01M12 14h.01M16 14h.01" stroke={color} strokeWidth={2} strokeLinecap="round"/>
-    </Svg>
-  );
-}
-
-function CalMonthIcon({ color }: { color: string }) {
-  return (
-    <Svg width={11} height={11} viewBox="0 0 24 24" fill="none">
-      <Rect x={3} y={4} width={18} height={17} rx={3} stroke={color} strokeWidth={2}/>
-      <Path d="M8 2v3M16 2v3M3 9h18" stroke={color} strokeWidth={2} strokeLinecap="round"/>
-      <Circle cx={12} cy={15} r={3} stroke={color} strokeWidth={2}/>
-    </Svg>
-  );
-}
-
 function SearchIcon() {
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
@@ -58,14 +37,22 @@ function SearchIcon() {
   );
 }
 
-// ─── Avatar ───────────────────────────────────────────────────────────────────
+function SettingsIcon({ color }: { color: string }) {
+  return (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={3} stroke={color} strokeWidth={2}/>
+      <Path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m2.12 2.12l4.24 4.24M4.22 19.78l4.24-4.24m2.12-2.12l4.24-4.24M1 12h6m6 0h6" stroke={color} strokeWidth={2} strokeLinecap="round"/>
+    </Svg>
+  );
+}
+
 export function Avatar({ initials, color, size = 42 }: {
   initials: string; color: string; size?: number;
 }) {
   return (
     <View style={[styles.avatar, {
       width: size, height: size,
-      borderRadius: size * 0.286, // matches HTML: border-radius: 12px on 42px = 0.286
+      borderRadius: size * 0.286,
       backgroundColor: color + '22',
       borderColor: color + '44',
     }]}>
@@ -74,7 +61,6 @@ export function Avatar({ initials, color, size = 42 }: {
   );
 }
 
-// ─── TagBadge ─────────────────────────────────────────────────────────────────
 export function TagBadge({ label, color }: { label: string; color: string }) {
   return (
     <View style={[styles.tag, { backgroundColor: color + '15', borderColor: color + '40' }]}>
@@ -83,7 +69,6 @@ export function TagBadge({ label, color }: { label: string; color: string }) {
   );
 }
 
-// ─── SectionLabel ─────────────────────────────────────────────────────────────
 export function SectionLabel({ label, count }: { label: string; count?: number }) {
   const C = useColors();
   return (
@@ -96,7 +81,6 @@ export function SectionLabel({ label, count }: { label: string; count?: number }
   );
 }
 
-// ─── GlassCard ────────────────────────────────────────────────────────────────
 export function GlassCard({ title, accentColor, children, style }: {
   title: string; accentColor: string;
   children: React.ReactNode; style?: ViewStyle;
@@ -114,20 +98,18 @@ export function GlassCard({ title, accentColor, children, style }: {
   );
 }
 
-// ─── DateFilterBar — horizontal compact chips with SVG icons ─────────────────
-export type DateFilter = 'all' | 'today' | 'week' | 'month';
+export type DateFilter = 'all' | 'today';
 
-export function DateFilterBar({ active, onChange }: {
+export function DateFilterBar({ active, onChange, onCalendarPress }: {
   active: DateFilter;
   onChange: (f: DateFilter) => void;
+  onCalendarPress?: () => void;
 }) {
   const C = useColors();
 
   const options: { key: DateFilter; label: string; Icon: any }[] = [
-    { key: 'all',   label: 'All Time',   Icon: ClockIcon    },
-    { key: 'today', label: 'Today',      Icon: CalIcon      },
-    { key: 'week',  label: 'This Week',  Icon: CalWeekIcon  },
-    { key: 'month', label: 'This Month', Icon: CalMonthIcon },
+    { key: 'all', label: 'All Time', Icon: ClockIcon },
+    { key: 'today', label: 'Today', Icon: CalIcon },
   ];
 
   return (
@@ -157,6 +139,19 @@ export function DateFilterBar({ active, onChange }: {
           </TouchableOpacity>
         );
       })}
+      <TouchableOpacity
+        onPress={onCalendarPress}
+        activeOpacity={0.7}
+        style={[
+          styles.dateFilterBtn,
+          { borderColor: C.border, backgroundColor: C.surface },
+        ]}
+      >
+        <CalIcon color={C.textMuted} />
+        <Text style={[styles.dateFilterText, { color: C.textMuted }]}>
+          Calendar
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -167,36 +162,38 @@ export function applyDateFilter(conversations: Conversation[], filter: DateFilte
   return conversations.filter((c) => {
     const d = new Date(c.date);
     if (filter === 'today') return d.toDateString() === now.toDateString();
-    if (filter === 'week')  { const w = new Date(now); w.setDate(now.getDate() - 7); return d >= w; }
-    if (filter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     return true;
   });
 }
 
-// ─── highlight helper ─────────────────────────────────────────────────────────
 function highlightMatch(text: string, query: string, C: any): React.ReactNode {
   const snippet = text.slice(0, 80);
   if (!query) return <Text style={[styles.convSnippet, { color: C.textMuted }]}>{snippet}...</Text>;
-  const lower = text.toLowerCase();
-  const idx   = lower.indexOf(query.toLowerCase());
-  if (idx === -1) return <Text style={[styles.convSnippet, { color: C.textMuted }]}>{snippet}...</Text>;
+  
+  try {
+    const lower = text.toLowerCase();
+    const idx = lower.indexOf(query.toLowerCase());
+    if (idx === -1) return <Text style={[styles.convSnippet, { color: C.textMuted }]}>{snippet}...</Text>;
 
-  const start  = Math.max(0, idx - 20);
-  const end    = Math.min(text.length, idx + query.length + 40);
-  const before = (start > 0 ? '...' : '') + text.slice(start, idx);
-  const match  = text.slice(idx, idx + query.length);
-  const after  = text.slice(idx + query.length, end) + (end < text.length ? '...' : '');
+    const start = Math.max(0, idx - 20);
+    const end = Math.min(text.length, idx + query.length + 40);
+    const before = (start > 0 ? '...' : '') + text.slice(start, idx);
+    const match = text.slice(idx, idx + query.length);
+    const after = text.slice(idx + query.length, end) + (end < text.length ? '...' : '');
 
-  return (
-    <Text style={[styles.convSnippet, { color: C.textMuted }]}>
-      {before}
-      <Text style={{ backgroundColor: C.purple + '33', color: C.purple }}>{match}</Text>
-      {after}
-    </Text>
-  );
+    return (
+      <Text style={[styles.convSnippet, { color: C.textMuted }]}>
+        {before}
+        <Text style={{ backgroundColor: C.purple + '33', color: C.purple }}>{match}</Text>
+        {after}
+      </Text>
+    );
+  } catch (error) {
+    console.error('Error highlighting match:', error);
+    return <Text style={[styles.convSnippet, { color: C.textMuted }]}>{snippet}...</Text>;
+  }
 }
 
-// ─── ConvCard ─────────────────────────────────────────────────────────────────
 export function ConvCard({
   conversation: c, onPress, onStar, onLongPress, searchQuery = '',
 }: {
@@ -208,7 +205,10 @@ export function ConvCard({
 }) {
   const C = useColors();
   let timeAgo = '';
-  try { timeAgo = formatDistanceToNow(new Date(c.date), { addSuffix: true }); } catch { timeAgo = ''; }
+  try { timeAgo = formatDistanceToNow(new Date(c.date), { addSuffix: true }); } catch (error) { 
+    console.error('Error formatting date:', error);
+    timeAgo = ''; 
+  }
 
   return (
     <TouchableOpacity
@@ -249,7 +249,6 @@ export function ConvCard({
   );
 }
 
-// ─── LiveDot ──────────────────────────────────────────────────────────────────
 export function LiveDot() {
   const C = useColors();
   return (
@@ -260,10 +259,16 @@ export function LiveDot() {
   );
 }
 
-// ─── SearchBarIcon export ─────────────────────────────────────────────────────
+export function SettingsIconButton({ onPress, color }: { onPress: () => void; color: string }) {
+  return (
+    <TouchableOpacity onPress={onPress} hitSlop={12}>
+      <SettingsIcon color={color} />
+    </TouchableOpacity>
+  );
+}
+
 export { SearchIcon };
 
-// ─── SavedModal ───────────────────────────────────────────────────────────────
 export function SavedModal({ visible, onViewSummary, onViewTranscript, onDismiss, contactName }: {
   visible: boolean;
   onViewSummary: () => void;
@@ -298,110 +303,54 @@ export function SavedModal({ visible, onViewSummary, onViewTranscript, onDismiss
         >
           <Text style={[savedStyles.secondaryBtnText, { color: C.textSecondary }]}>📝  View Transcript</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onDismiss} style={{ marginTop: 12, paddingVertical: 8 }}>
-          <Text style={[savedStyles.dismissText, { color: C.textMuted }]}>Back to Home</Text>
+        <TouchableOpacity
+          style={[savedStyles.secondaryBtn, { borderColor: C.border }]}
+          onPress={onDismiss}
+        >
+          <Text style={[savedStyles.secondaryBtnText, { color: C.textSecondary }]}>Done</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  avatar: { alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  avatarText: { fontFamily: 'Sora_700Bold' },
-
-  // tag badge — from HTML: padding: 2px 9px, border-radius: 99px, border: 1.5px
-  tag: { borderRadius: Radius.full, borderWidth: 1.5, paddingHorizontal: 9, paddingVertical: 2 },
-  tagText: { fontSize: 10, fontFamily: 'Sora_700Bold' },
-
-  sectionRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 18, marginBottom: 9,
-  },
-  sectionLabel: {
-    fontSize: 11, fontFamily: 'Sora_700Bold',
-    letterSpacing: 1.5, textTransform: 'uppercase',
-  },
-  sectionCount: { fontSize: 11, fontFamily: 'Sora_600SemiBold' },
-
-  glassCard: {
-    borderRadius: Radius.lg, borderWidth: 1.5,
-    padding: Spacing.lg, marginBottom: Spacing.md,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
-  },
-  glassCardTitle: { ...Typography.label, marginBottom: Spacing.sm },
-
-  // date filter chips — from HTML: height:30px, padding: 6px 12px, gap:5px
-  dateFilterContent: {
-    paddingHorizontal: Spacing.xl,
-    gap: 7,
-    paddingBottom: 12,
-    alignItems: 'center',
-  },
-  dateFilterBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-    borderWidth: 1.5,
-    height: 30,
-  },
-  dateFilterText: { fontSize: 11, fontFamily: 'Sora_700Bold' },
-
-  // conv card — from HTML: border-radius:18px, padding:14px, gap:11px, border:1.5px
-  convCard: {
-    borderRadius: 18,
-    borderWidth: 1.5,
-    marginBottom: 8,
-    padding: 14,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
-  },
-  convCardInner: { flexDirection: 'row', gap: 11 },
-  convContent: { flex: 1 },
-  convTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 },
-  // cname: font-size:14px, font-weight:800
-  convContact: { fontSize: 14, fontFamily: 'Sora_700Bold', flex: 1 },
-  // ctime: font-size:10px, font-weight:600
-  convTime: { fontSize: 10, fontFamily: 'Sora_600SemiBold' },
-  // csnip: font-size:12px, line-height:1.6
-  convSnippet: { fontSize: 12, lineHeight: 19, fontFamily: 'Sora_400Regular' },
-  convTagRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  avatar: { borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: 'Nunito_700Bold' },
+  tag: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, flexShrink: 0 },
+  tagText: { fontSize: 10, fontFamily: 'Nunito_600SemiBold' },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
+  sectionLabel: { fontSize: 12, fontFamily: 'Nunito_700Bold', letterSpacing: 1.5 },
+  sectionCount: { fontSize: 11, fontFamily: 'Nunito_600SemiBold' },
+  glassCard: { borderWidth: 1.5, borderRadius: Radius.lg, padding: Spacing.lg, gap: 12, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
+  glassCardTitle: { fontSize: 13, fontFamily: 'Nunito_700Bold', letterSpacing: 1.5 },
+  dateFilterContent: { paddingHorizontal: 16, gap: 10, paddingVertical: 12 },
+  dateFilterBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: Radius.full, paddingHorizontal: 14, paddingVertical: 8, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
+  dateFilterText: { fontSize: 12, fontFamily: 'Nunito_600SemiBold' },
+  convCard: { borderWidth: 1.5, borderRadius: Radius.lg, paddingHorizontal: 12, paddingVertical: 12, marginBottom: 10, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
+  convCardInner: { flexDirection: 'row', gap: 12 },
+  convContent: { flex: 1, justifyContent: 'space-between', gap: 8 },
+  convTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  convContact: { fontSize: 14, fontFamily: 'Nunito_700Bold', flex: 1 },
+  convTime: { fontSize: 11, fontFamily: 'Outfit_400Regular' },
+  convSnippet: { fontSize: 12, fontFamily: 'Outfit_400Regular', lineHeight: 18 },
   convBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  convDuration: { fontSize: 10, fontFamily: 'Sora_600SemiBold' },
+  convTagRow: { flexDirection: 'row', gap: 8, alignItems: 'center', flex: 1 },
+  convDuration: { fontSize: 10, fontFamily: 'Outfit_400Regular' },
   starBtn: { padding: 4 },
-
   liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  liveDot: {
-    width: 8, height: 8, borderRadius: 4,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1, shadowRadius: 4, elevation: 4,
-  },
-  liveText: { fontSize: 10, fontFamily: 'Sora_700Bold', letterSpacing: 1.5 },
+  liveDot: { width: 8, height: 8, borderRadius: 4, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 4, elevation: 2 },
+  liveText: { fontSize: 10, fontFamily: 'Nunito_800ExtraBold', letterSpacing: 1.5 },
 });
 
 const savedStyles = StyleSheet.create({
-  overlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: '#00000088',
-    alignItems: 'center', justifyContent: 'center', zIndex: 999,
-  },
-  card: {
-    width: 320, borderRadius: Radius.xxl, borderWidth: 1.5,
-    padding: 28, alignItems: 'center',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15, shadowRadius: 24, elevation: 12,
-  },
-  icon: { fontSize: 48, marginBottom: 12 },
-  title: { fontFamily: 'Sora_700Bold', fontSize: 20, marginBottom: 8 },
-  subtitle: { fontFamily: 'Sora_400Regular', fontSize: 13, textAlign: 'center', marginBottom: 24 },
-  primaryBtn: { width: '100%', borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
-  primaryBtnText: { fontFamily: 'Sora_700Bold', fontSize: 14, color: '#FFFFFF' },
-  secondaryBtn: { width: '100%', borderWidth: 1.5, borderRadius: Radius.md, paddingVertical: 14, alignItems: 'center' },
-  secondaryBtnText: { fontFamily: 'Sora_600SemiBold', fontSize: 14 },
-  dismissText: { fontFamily: 'Sora_400Regular', fontSize: 13 },
+  overlay: { flex: 1, backgroundColor: '#00000088', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  card: { width: '100%', maxWidth: 360, borderWidth: 1.5, borderRadius: Radius.xxl, padding: Spacing.xxl, alignItems: 'center', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 24, elevation: 12 },
+  icon: { fontSize: 44, marginBottom: 12 },
+  title: { fontSize: 18, fontFamily: 'Nunito_700Bold', marginBottom: 8, textAlign: 'center' },
+  subtitle: { fontSize: 13, fontFamily: 'Outfit_400Regular', marginBottom: 20, textAlign: 'center', lineHeight: 20 },
+  primaryBtn: { width: '100%', borderRadius: Radius.lg, paddingVertical: 12, alignItems: 'center', marginBottom: 10 },
+  primaryBtnText: { fontSize: 14, fontFamily: 'Nunito_700Bold', color: '#FFFFFF' },
+  secondaryBtn: { width: '100%', borderWidth: 1.5, borderRadius: Radius.lg, paddingVertical: 12, alignItems: 'center', marginBottom: 10 },
+  secondaryBtnText: { fontSize: 14, fontFamily: 'Nunito_600SemiBold' },
 });
