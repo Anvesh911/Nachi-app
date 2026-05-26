@@ -10,8 +10,6 @@ import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useColors, Radius } from '../../src/theme';
 import RecordingSheet from '../../src/screens/RecordingSheet';
 
-// ─── SVG Icons ────────────────────────────────────────────────────────────────
-
 function HomeIcon({ color }: { color: string }) {
   return (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
@@ -48,10 +46,8 @@ function MicIcon() {
   );
 }
 
-// ─── FAB ─────────────────────────────────────────────────────────────────────
-
 function FAB({ onPress }: { onPress: () => void }) {
-  const C     = useColors();
+  const C = useColors();
   const scale = useRef(new Animated.Value(1)).current;
   const opacity = useRef(new Animated.Value(0.6)).current;
 
@@ -59,12 +55,12 @@ function FAB({ onPress }: { onPress: () => void }) {
     Animated.loop(
       Animated.sequence([
         Animated.parallel([
-          Animated.timing(scale,   { toValue: 1.12, duration: 1000, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1.12, duration: 1000, useNativeDriver: true }),
           Animated.timing(opacity, { toValue: 0.15, duration: 1000, useNativeDriver: true }),
         ]),
         Animated.parallel([
-          Animated.timing(scale,   { toValue: 1,    duration: 1000, useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 0.6,  duration: 1000, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 1, duration: 1000, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.6, duration: 1000, useNativeDriver: true }),
         ]),
       ])
     ).start();
@@ -72,12 +68,10 @@ function FAB({ onPress }: { onPress: () => void }) {
 
   return (
     <TouchableOpacity onPress={onPress} style={styles.fabWrap} activeOpacity={0.85}>
-      {/* Pulse ring */}
       <Animated.View style={[
         styles.fabRing,
         { borderColor: C.purple + '4D', transform: [{ scale }], opacity },
       ]} />
-      {/* FAB button */}
       <View style={[styles.fabInner, {
         shadowColor: C.purple,
       }]}>
@@ -87,32 +81,30 @@ function FAB({ onPress }: { onPress: () => void }) {
   );
 }
 
-// ─── Custom Tab Bar ───────────────────────────────────────────────────────────
-
 function CustomTabBar({ state, navigation, onRecord }: any) {
   const C = useColors();
 
   const tabs = [
-    { name: state.routes[0].name, label: 'Home',     Icon: HomeIcon },
-    { name: 'fab',                label: '',          Icon: null     },
-    { name: state.routes[1].name, label: 'Starred',  Icon: StarIcon },
+    { name: state.routes[0].name, label: 'Home', Icon: HomeIcon },
+    { name: 'fab', label: '', Icon: null },
+    { name: state.routes[1].name, label: 'Starred', Icon: StarIcon },
     { name: state.routes[2].name, label: 'Settings', Icon: PersonIcon },
   ];
 
   return (
     <View style={[styles.tabBar, {
-      backgroundColor: 'rgba(255,255,255,0.97)',
+      backgroundColor: C.surface,
       borderTopColor: C.border,
+      shadowColor: C.purple,
     }]}>
       {tabs.map((tab, i) => {
         if (tab.name === 'fab') {
           return <FAB key="fab" onPress={onRecord} />;
         }
 
-        // Map route index (skipping fab slot)
         const routeIndex = i > 1 ? i - 1 : i;
-        const isActive   = state.index === routeIndex;
-        const color      = isActive ? C.purple : C.textMuted;
+        const isActive = state.index === routeIndex;
+        const color = isActive ? C.purple : C.textMuted;
 
         return (
           <TouchableOpacity
@@ -132,11 +124,8 @@ function CustomTabBar({ state, navigation, onRecord }: any) {
   );
 }
 
-// ─── Layout ───────────────────────────────────────────────────────────────────
-
 export default function TabsLayout() {
   const [showRecord, setShowRecord] = useState(false);
-  const C = useColors();
 
   return (
     <>
@@ -146,8 +135,8 @@ export default function TabsLayout() {
           <CustomTabBar {...props} onRecord={() => setShowRecord(true)} />
         )}
       >
-        <Tabs.Screen name="index"    options={{ title: 'Home' }} />
-        <Tabs.Screen name="starred"  options={{ title: 'Starred' }} />
+        <Tabs.Screen name="index" options={{ title: 'Home' }} />
+        <Tabs.Screen name="starred" options={{ title: 'Starred' }} />
         <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
       </Tabs>
 
@@ -177,7 +166,6 @@ const styles = StyleSheet.create({
     height: 72,
     alignItems: 'flex-start',
     paddingTop: 8,
-    shadowColor: '#7C4DFF',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.08,
     shadowRadius: 20,
@@ -194,10 +182,9 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 9,
-    fontFamily: 'Sora_700Bold',
+    fontFamily: 'Nunito_700Bold',
     letterSpacing: 0.5,
   },
-  // FAB
   fabWrap: {
     flex: 1,
     alignItems: 'center',
@@ -221,8 +208,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 20,
     elevation: 12,
-    // gradient simulation — use LinearGradient if expo-linear-gradient installed:
-    // background: linear-gradient(145deg, #9C6FFF, #7C4DFF)
   },
   modalBackdrop: {
     flex: 1,
