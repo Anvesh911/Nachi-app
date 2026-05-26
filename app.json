@@ -1,79 +1,53 @@
 {
   "expo": {
     "name": "AnVy",
-    "slug": "anvy",
+    "slug": "anvy-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
-    "backgroundColor": "#070B14",
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#070B14"
+      "backgroundColor": "#ffffff"
     },
-    "scheme": "anvy",
-    "platforms": ["android"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTabletMode": true,
+      "bundleIdentifier": "com.anvy.app"
+    },
     "android": {
-      "package": "com.anveshnachi.anvy",
-      "versionCode": 1,
-      "compileSdkVersion": 35,
-      "targetSdkVersion": 35,
-      "minSdkVersion": 24,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#070B14"
+        "backgroundColor": "#ffffff"
       },
-      "permissions": [
-        "RECORD_AUDIO",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_PHONE_STATE",
-        "READ_CALL_LOG",
-        "USE_BIOMETRIC",
-        "USE_FINGERPRINT",
-        "VIBRATE",
-        "RECEIVE_BOOT_COMPLETED",
-        "SCHEDULE_EXACT_ALARM",
-        "INTERNET"
-      ],
-      "blockedPermissions": [
-        "android.permission.READ_CONTACTS"
-      ]
+      "package": "com.anvy.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      "expo-font",
       [
-        "expo-av",
+        "expo-build-properties",
         {
-          "microphonePermission": "Allow AnVy to record conversations."
+          "ios": {
+            "useFrameworks": "static"
+          },
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "buildToolsVersion": "34.0.0"
+          }
         }
-      ],
-      [
-        "expo-local-authentication",
-        {
-          "faceIDPermission": "Allow AnVy to use Face ID."
-        }
-      ],
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/notification-icon.png",
-          "color": "#00B4FF"
-        }
-      ],
-      [
-        "expo-sqlite"
       ]
     ],
-    "experiments": {
-      "typedRoutes": true
-    },
     "extra": {
       "eas": {
-        "projectId": "999d6f8c-96bd-4429-81d4-28ef5b028163"
+        "projectId": "anvy-reminder-app"
       }
-    }
+    },
+    "scheme": "anvy"
   }
 }
