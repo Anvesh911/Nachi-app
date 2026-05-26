@@ -3,20 +3,44 @@
     "name": "AnVy",
     "slug": "anvy-app",
     "version": "1.0.0",
+
     "orientation": "portrait",
+
     "icon": "./assets/icon.png",
+
+    "scheme": "anvy",
+
+    "userInterfaceStyle": "dark",
+
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+
     "ios": {
       "bundleIdentifier": "com.anvy.app"
     },
+
     "android": {
-      "package": "com.anvy.app"
+      "package": "com.anvy.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
     },
-    "scheme": "anvy"
+
+    "plugins": [
+      "expo-router"
+    ],
+
+    "extra": {
+      "eas": {
+        "projectId": "999d6f8c-96bd-4429-81d4-28ef5b028163"
+      }
+    }
   }
 }
