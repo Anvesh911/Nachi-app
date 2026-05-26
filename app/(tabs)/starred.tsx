@@ -1,26 +1,40 @@
 // app/(tabs)/starred.tsx
 
-import { useCallback } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { useEffect, useCallback } from 'react';
+import {
+  View, Text, StyleSheet, RefreshControl,
+} from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors, Typography, Spacing, Radius } from '../../src/theme';
+import { useColors, Spacing } from '../../src/theme';
 import { useStore } from '../../src/store/useStore';
-import { ConvCard } from '../../src/components';
+import { ConvCard, SectionLabel } from '../../src/components';
 import { Conversation } from '../../src/services/types';
 
 export default function StarredScreen() {
-  const insets  = useSafeAreaInsets();
-  const C       = useColors();
-  const { conversations, toggleStar } = useStore();
+  const insets = useSafeAreaInsets();
+  const C = useColors();
+  const {
+    loadConversations, isLoading,
+    conversations, toggleStar,
+  } = useStore();
+
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
   const starred = conversations.filter((c) => c.starred);
+
+  const onPressConv = useCallback((id: string) => {
+    router.push(`/detail/${id}`);
+  }, []);
 
   const renderItem = useCallback(
     ({ item }: { item: Conversation }) => (
       <ConvCard
         conversation={item}
-        onPress={() => router.push(`/detail/${item.id}`)}
+        onPress={() => onPressConv(item.id)}
         onStar={() => toggleStar(item.id)}
       />
     ),
@@ -29,55 +43,41 @@ export default function StarredScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: C.background, paddingTop: insets.top }]}>
-
-      {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.eyebrow, { color: C.textMuted }]}>SAVED</Text>
-        <Text style={[styles.title, { color: C.textPrimary }]}>
-          Starred <Text style={{ color: C.purple }}>·</Text>
-        </Text>
+        <View>
+          <Text style={[styles.greeting, { color: C.textMuted }]}>FAVORITES</Text>
+          <Text style={[styles.appName, { color: C.textPrimary }]}>
+            Starred <Text style={{ color: C.purple }}>·</Text>
+          </Text>
+        </View>
       </View>
 
-      {/* Stats pill */}
-      {starred.length > 0 && (
-        <View style={styles.statRow}>
-          <View style={[styles.statPill, {
-            backgroundColor: C.purplePale,
-            borderColor: C.purple + '40',
-          }]}>
-            <Text style={[styles.statText, { color: C.purple }]}>
-              ⭐  {starred.length} saved conversation{starred.length !== 1 ? 's' : ''}
+      <View style={styles.listContainer}>
+        <SectionLabel label="⭐ Your Starred Conversations" count={starred.length} />
+        {starred.length === 0 ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyIcon}>⭐</Text>
+            <Text style={[styles.emptyText, { color: C.textMuted }]}>
+              No starred conversations yet.{'\n'}Star conversations to save them here.
             </Text>
           </View>
-        </View>
-      )}
-
-      {/* List */}
-      <View style={styles.list}>
-        <FlashList
-          data={starred}
-          renderItem={renderItem}
-          estimatedItemSize={110}
-          keyExtractor={(item) => item.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 100, paddingTop: 4 }}
-          ListEmptyComponent={
-            <View style={styles.empty}>
-              <View style={[styles.emptyIconWrap, {
-                backgroundColor: C.purplePale,
-                borderColor: C.border,
-              }]}>
-                <Text style={styles.emptyIcon}>⭐</Text>
-              </View>
-              <Text style={[styles.emptyTitle, { color: C.textPrimary }]}>
-                No starred conversations
-              </Text>
-              <Text style={[styles.emptyText, { color: C.textMuted }]}>
-                Tap ⭐ on any conversation{'\n'}to save it here.
-              </Text>
-            </View>
-          }
-        />
+        ) : (
+          <FlashList
+            data={starred}
+            renderItem={renderItem}
+            estimatedItemSize={120}
+            keyExtractor={(item) => item.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            refreshControl={
+              <RefreshControl
+                refreshing={isLoading}
+                onRefresh={loadConversations}
+                tintColor={C.purple}
+              />
+            }
+          />
+        )}
       </View>
     </View>
   );
@@ -85,24 +85,38 @@ export default function StarredScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  header: { paddingHorizontal: 22, paddingTop: 10, paddingBottom: 4 },
-  eyebrow: { fontSize: 11, fontFamily: 'Sora_700Bold', letterSpacing: 2, marginBottom: 3 },
-  title: { fontSize: 26, fontFamily: 'Sora_800ExtraBold' },
-  statRow: { paddingHorizontal: 16, marginBottom: 12 },
-  statPill: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 14, paddingVertical: 6,
-    borderRadius: Radius.full, borderWidth: 1.5,
+  header: {
+    paddingHorizontal: 22,
+    paddingTop: 10,
+    paddingBottom: 12,
   },
-  statText: { fontSize: 12, fontFamily: 'Sora_600SemiBold' },
-  list: { flex: 1, paddingHorizontal: 16 },
-  empty: { alignItems: 'center', paddingVertical: 60 },
-  emptyIconWrap: {
-    width: 72, height: 72, borderRadius: 24,
-    borderWidth: 1.5, alignItems: 'center',
-    justifyContent: 'center', marginBottom: 16,
+  greeting: {
+    fontSize: 11,
+    fontFamily: 'Nunito_700Bold',
+    letterSpacing: 2,
+    marginBottom: 3,
   },
-  emptyIcon: { fontSize: 32 },
-  emptyTitle: { fontFamily: 'Sora_700Bold', fontSize: 16, marginBottom: 8 },
-  emptyText: { ...Typography.bodyM, textAlign: 'center', lineHeight: 22 },
+  appName: {
+    fontSize: 26,
+    fontFamily: 'Nunito_900Black',
+  },
+  listContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    marginTop: Spacing.md,
+  },
+  empty: {
+    alignItems: 'center',
+    paddingVertical: 80,
+  },
+  emptyIcon: {
+    fontSize: 44,
+    marginBottom: 16,
+  },
+  emptyText: {
+    fontFamily: 'Outfit_400Regular',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
 });
