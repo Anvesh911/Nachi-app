@@ -12,7 +12,7 @@ import { useColors, Typography, Spacing, Radius } from '../../src/theme';
 import { useStore } from '../../src/store/useStore';
 import {
   ConvCard, Avatar, LiveDot, SectionLabel,
-  DateFilterBar, DateFilter, applyDateFilter, SearchIcon,
+  DateFilterBar, DateFilter, applyDateFilter, SearchIcon, SettingsIconButton,
 } from '../../src/components';
 import { Conversation } from '../../src/services/types';
 
@@ -32,10 +32,11 @@ export default function HomeScreen() {
 
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
 
-  useEffect(() => { loadConversations(); }, []);
+  useEffect(() => { 
+    loadConversations(); 
+  }, []);
 
   const filtered = applyDateFilter(getFiltered(), dateFilter);
-  const starred  = conversations.filter((c) => c.starred);
 
   const onPressConv = useCallback((id: string) => {
     router.push(`/detail/${id}`);
@@ -72,18 +73,22 @@ export default function HomeScreen() {
   return (
     <View style={[styles.root, { backgroundColor: C.background, paddingTop: insets.top }]}>
 
-      {/* Header — from HTML: padding: 10px 22px 12px */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.greeting, { color: C.textMuted }]}>GOOD DAY</Text>
           <Text style={[styles.appName, { color: C.textPrimary }]}>
-            Nachi <Text style={{ color: C.purple }}>·</Text>
+            AnVy <Text style={{ color: C.purple }}>·</Text>
           </Text>
         </View>
-        <LiveDot />
+        <View style={styles.headerRight}>
+          <LiveDot />
+          <SettingsIconButton 
+            onPress={() => router.push('/(tabs)/settings')} 
+            color={C.purple}
+          />
+        </View>
       </View>
 
-      {/* Search — from HTML: margin:0 16px, border-radius:16px, padding:10px 14px */}
       <View style={[styles.searchContainer, {
         backgroundColor: C.surface,
         borderColor: C.border,
@@ -106,7 +111,6 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Tag filter — from HTML: padding:0 16px 11px, gap:7px */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -133,46 +137,8 @@ export default function HomeScreen() {
         ))}
       </ScrollView>
 
-      {/* Date filter */}
       <DateFilterBar active={dateFilter} onChange={setDateFilter} />
 
-      {/* Starred row — from HTML: width:134px, border-radius:18px, padding:14px */}
-      {!searchQuery && starred.length > 0 && (
-        <View style={styles.starredSection}>
-          <SectionLabel label="⭐  Starred" count={starred.length} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 10, paddingBottom: 4 }}
-          >
-            {starred.map((c) => (
-              <TouchableOpacity
-                key={c.id}
-                style={[styles.starredCard, {
-                  backgroundColor: C.surface,
-                  borderColor: C.border,
-                  shadowColor: C.purple,
-                }]}
-                onPress={() => onPressConv(c.id)}
-                activeOpacity={0.75}
-              >
-                <Avatar initials={c.avatar} color={c.avatarColor} size={38} />
-                <Text style={[styles.starredName, { color: C.textPrimary }]} numberOfLines={1}>
-                  {c.contact}
-                </Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={[styles.starredTag, { color: c.tagColor }]}>{c.tag}</Text>
-                  <TouchableOpacity onPress={() => toggleStar(c.id)} hitSlop={8}>
-                    <Text style={{ fontSize: 14 }}>⭐</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Recent conversations */}
       <View style={styles.listContainer}>
         <SectionLabel
           label={searchQuery ? `Results for "${searchQuery}"` : 'Recent Conversations'}
@@ -213,17 +179,18 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  // header: padding 10px 22px 12px
   header: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'flex-end',
     paddingHorizontal: 22, paddingTop: 10, paddingBottom: 12,
   },
-  // greeting: font-size:11px, font-weight:700, letter-spacing:2px
-  greeting: { fontSize: 11, fontFamily: 'Sora_700Bold', letterSpacing: 2, marginBottom: 3 },
-  // app-name: font-size:26px, font-weight:900
-  appName: { fontSize: 26, fontFamily: 'Sora_800ExtraBold' },
-  // search: margin:0 16px, border-radius:16px, padding:10px 14px, border:1.5px
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  greeting: { fontSize: 11, fontFamily: 'Nunito_700Bold', letterSpacing: 2, marginBottom: 3 },
+  appName: { fontSize: 26, fontFamily: 'Nunito_900Black' },
   searchContainer: {
     flexDirection: 'row', alignItems: 'center',
     borderRadius: 16, borderWidth: 1.5,
@@ -231,27 +198,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 10, gap: 8,
     shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
   },
-  searchInput: { flex: 1, fontFamily: 'Sora_400Regular', fontSize: 13 },
+  searchInput: { flex: 1, fontFamily: 'Outfit_400Regular', fontSize: 13 },
   clearBtn: { fontSize: 15 },
-  // tags: padding:0 16px 11px, gap:7px
   tagsScroll: { maxHeight: 44 },
   tagsContent: { paddingHorizontal: 16, gap: 7, paddingBottom: 11 },
-  // tag: padding:6px 14px, border-radius:99px, border:1.5px, font-size:12px
-  tag: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.full, borderWidth: 1.5 },
-  tagText: { fontSize: 12, fontFamily: 'Sora_600SemiBold' },
-  // starred: padding:0 16px 14px, card width:134px, border-radius:18px, padding:14px
-  starredSection: { paddingHorizontal: 16, marginTop: 4, marginBottom: 4 },
-  starredCard: {
-    width: 134, borderWidth: 1.5,
-    borderRadius: 18, padding: 14, gap: 8,
-    shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
-  },
-  // sname: font-size:13px, font-weight:800
-  starredName: { fontSize: 13, fontFamily: 'Sora_700Bold' },
-  starredTag: { fontSize: 11, fontFamily: 'Sora_600SemiBold' },
+  tag: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, borderWidth: 1.5 },
+  tagText: { fontSize: 12, fontFamily: 'Nunito_600SemiBold' },
   listContainer: { flex: 1, paddingHorizontal: 16, marginTop: 4 },
-  hint: { fontSize: 10, fontFamily: 'Sora_400Regular', marginBottom: Spacing.sm, marginTop: -4 },
+  hint: { fontSize: 10, fontFamily: 'Outfit_400Regular', marginBottom: Spacing.sm, marginTop: -4 },
   empty: { alignItems: 'center', paddingVertical: 60 },
   emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { ...Typography.bodyM, textAlign: 'center', lineHeight: 22 },
+  emptyText: { fontFamily: 'Outfit_400Regular', fontSize: 13, textAlign: 'center', lineHeight: 22 },
 });
